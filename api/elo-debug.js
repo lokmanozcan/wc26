@@ -1,15 +1,15 @@
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   try {
-    const response = await fetch("https://www.eloratings.net/2026_World_Cup", {
+    const response = await fetch("https://www.eloratings.net/scripts/ratings.js", {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml",
+        "Referer": "https://www.eloratings.net/2026_World_Cup",
       },
     });
-    const html = await response.text();
+    const text = await response.text();
     res.setHeader("Content-Type", "text/plain");
-    return res.status(200).send(html.substring(0, 3000));
+    return res.status(200).send(text.substring(0, 5000));
   } catch(e) {
     return res.status(500).json({ error: e.message });
   }
