@@ -358,14 +358,20 @@ function BracketView({ bracket, knockoutScores }) {
           </div>
           <div className="champion-box" style={{ margin:"8px 0" }}>
             <img src={LOGO_URL} style={{ width: 44, height: 44, margin: "0 auto 6px", objectFit: "contain" }} alt="Kupa" />
-            <div style={{ fontSize:9, fontWeight:900, color:"#b45309", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"monospace" }}>WORLD CHAMPION</div>
+            <div style={{ fontSize:9, fontWeight:900, color:"#b45309", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"monospace",display:"flex",alignItems:"center",justifyContent:"center",gap:5 }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="#d97706" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              WORLD CHAMPION
+            </div>
             <div style={{ marginTop:6, background:"#ffffff", borderRadius:8, padding:"6px 10px", display:"flex", alignItems:"center", justifyContent:"center", gap:6, border:"1px solid #d97706", boxShadow:"0 2px 4px rgba(0,0,0,0.05)" }}>
               <img src={getFlagUrl(INITIAL_TEAMS[bracket.finalMatch.winner]?.iso)} style={{ width:18,height:12,borderRadius:2,objectFit:"cover" }} alt="" />
               <span style={{ fontSize:12.5,fontWeight:900,color:"#b45309" }}>{INITIAL_TEAMS[bracket.finalMatch.winner]?.name||"---"}</span>
             </div>
 
             <div style={{ marginTop:12, borderTop:"1px solid #e2e8f0", paddingTop:8 }}>
-              <div style={{ fontSize:9, fontWeight:900, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4, fontFamily:"monospace" }}>KAZANMA OLASILIKLARI</div>
+              <div style={{ fontSize:9, fontWeight:900, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4, fontFamily:"monospace",display:"flex",alignItems:"center",gap:4 }}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              KAZANMA OLASILIKLARI
+            </div>
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10.5, fontFamily:"monospace", fontWeight:700, marginBottom:3 }}>
                 <span style={{ color:"#047857" }}>{bracket.finalMatch.pA}%</span>
                 <span style={{ color:"#1d4ed8" }}>{bracket.finalMatch.pB}%</span>
@@ -384,7 +390,10 @@ function BracketView({ bracket, knockoutScores }) {
             </div>
           </div>
           <div style={{ borderTop:"1px solid #e2e8f0", paddingTop:8 }}>
-            <div style={{ fontSize:9, fontWeight:900, color:"#0891b2", textTransform:"uppercase", letterSpacing:"0.08em", fontFamily:"monospace", textAlign:"center", marginBottom:5 }}>🥉 ÜÇÜNCÜLÜK MAÇI</div>
+            <div style={{ fontSize:9, fontWeight:900, color:"#0891b2", textTransform:"uppercase", letterSpacing:"0.08em", fontFamily:"monospace", textAlign:"center", marginBottom:5,display:"flex",alignItems:"center",justifyContent:"center",gap:4 }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="#cd7f32" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              ÜÇÜNCÜLÜK MAÇI
+            </div>
             <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"6px 8px" }}>
               {[{id:bracket.thirdPlaceMatch.idA, p:bracket.thirdPlaceMatch.pA},{id:bracket.thirdPlaceMatch.idB, p:bracket.thirdPlaceMatch.pB}].map((t,i) => (
                 <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:11, color:"var(--text-primary)", ...(i>0?{borderTop:"1px solid #edf2f7",paddingTop:4,marginTop:4}:{}) }}>
@@ -395,8 +404,9 @@ function BracketView({ bracket, knockoutScores }) {
                   <span style={{ color:"#0891b2", fontWeight:700, fontFamily:"monospace" }}>{t.p}%</span>
                 </div>
               ))}
-              <div style={{ marginTop:6, background:"rgba(6,182,212,0.08)", border:"1px solid rgba(6,182,212,0.2)", borderRadius:6, padding:"4px 6px", textAlign:"center", fontSize:11, fontWeight:800, color:"#0891b2" }}>
-                🥉 {INITIAL_TEAMS[bracket.thirdPlaceMatch.winner]?.name}
+              <div style={{ marginTop:6, background:"rgba(6,182,212,0.08)", border:"1px solid rgba(6,182,212,0.2)", borderRadius:6, padding:"4px 6px", textAlign:"center", fontSize:11, fontWeight:800, color:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",gap:5 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="#cd7f32" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                {INITIAL_TEAMS[bracket.thirdPlaceMatch.winner]?.name}
               </div>
             </div>
           </div>
@@ -876,15 +886,21 @@ export default function App() {
   return (
     <div style={{minHeight:"100vh",background:"var(--bg-deep)",color:"var(--text-primary)",fontFamily:"system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
       {/* HEADER */}
-      <header style={{height:58,background:"#ffffff",borderBottom:"1px solid #e2e8f0",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 8px rgba(0,0,0,0.04)"}}>
+      <header style={{height:62,background:"#0a0f1e",borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 16px rgba(0,0,0,0.3)"}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <img src={LOGO_URL} style={{ width: 34, height: 34, objectFit: "contain" }} alt="Logo" />
+          <div style={{position:"relative"}}>
+            <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#d97706,#f59e0b)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(217,119,6,0.4)"}}>
+              <img src={LOGO_URL} style={{width:26,height:26,objectFit:"contain"}} alt="Logo" />
+            </div>
+          </div>
           <div>
-            <h1 style={{margin:0,fontSize:14,fontWeight:900,letterSpacing:"0.05em",textTransform:"uppercase",color:"#0f172a"}}>WORLDCUP'26 ANALYTICA</h1>
-            <p style={{margin:0,fontSize:9,color:"#059669",fontFamily:"monospace",fontWeight:700,letterSpacing:"0.15em"}}>10,000× MONTE CARLO LIVE PROJECTION</p>
+            <h1 style={{margin:0,fontSize:14.5,fontWeight:900,letterSpacing:"0.08em",textTransform:"uppercase",color:"#ffffff",fontFamily:"'Inter',system-ui,sans-serif"}}>
+              WORLDCUP<span style={{color:"#f59e0b"}}>'26</span> ANALYTICA
+            </h1>
+            <p style={{margin:0,fontSize:8.5,color:"#10b981",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:"0.18em"}}>10,000× MONTE CARLO LIVE PROJECTION</p>
           </div>
         </div>
-        <nav style={{display:"flex",background:"#f1f5f9",padding:4,borderRadius:10,border:"1px solid #e2e8f0",gap:2}}>
+        <nav style={{display:"flex",background:"rgba(255,255,255,0.06)",padding:4,borderRadius:12,border:"1px solid rgba(255,255,255,0.1)",gap:2}}>
           {[["bracket","Turnuva Ağacı"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["elo","ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>setActiveTab(tab)} className={`nav-btn ${activeTab===tab?"active":"inactive"}`}>{label}</button>
           ))}
@@ -895,34 +911,35 @@ export default function App() {
 
         {/* === BRACKET TAB === */}
         {activeTab==="bracket" && bracket && (
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {/* 4x3 Groups Grid + 3.ler Panel side by side */}
-            <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {/* 4x3 Groups Grid + 3.ler Panel side by side - SAME HEIGHT */}
+            <div style={{display:"flex",gap:12,alignItems:"stretch"}}>
               {/* Groups 4x3 */}
-              <div style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(0,0,0,0.02)"}}>
+              <div style={{flex:1,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
                 <div className="groups-panel-grid">{renderGroups()}</div>
               </div>
-              {/* Thirds Panel - right side */}
-              <div style={{width:200,flexShrink:0,background:"#ffffff",border:"1px solid #d1fae5",borderLeft:"3px solid #10b981",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(16,185,129,0.06)"}}>
-                <div style={{fontSize:10,fontWeight:900,color:"#047857",marginBottom:10,display:"flex",alignItems:"center",gap:5,fontFamily:"monospace",letterSpacing:"0.06em",textTransform:"uppercase"}}>
-                  <span style={{fontSize:13}}>⏳</span> En İyi 3.ler
+              {/* Thirds Panel - right side, same height */}
+              <div style={{width:220,flexShrink:0,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
+                <div style={{fontSize:10,fontWeight:900,color:"#0f172a",marginBottom:10,display:"flex",alignItems:"center",gap:7,letterSpacing:"0.07em",textTransform:"uppercase",fontFamily:"'Inter',system-ui,sans-serif",paddingBottom:8,borderBottom:"2px solid #f0fdf4"}}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  <span style={{color:"#047857"}}>EN İYİ 3.LER</span>
                 </div>
-                <div className="thirds-grid">
+                <div className="thirds-grid" style={{flex:1}}>
                   {bracket.sortedThirds.map((id, index) => {
                     const isQ = bracket.qualifiedThirds.includes(id);
                     const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
                     const tData = liveTableData.thirds.find(x => x.id === id) || { pts: 0, gd: 0 };
                     return (
                       <div key={id} className={`third-chip ${isQ ? "qualified" : "eliminated"}`}>
-                        <span style={{fontSize:9,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",flexShrink:0,minWidth:14}}>{index+1}.</span>
-                        <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:15,height:11,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
-                        <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:11.5,fontWeight:600}}>
+                        <span style={{fontSize:9,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",flexShrink:0,minWidth:16}}>{index+1}.</span>
+                        <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
+                        <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12,fontWeight:700,color:isQ?"#0f172a":"#94a3b8"}}>
                           {INITIAL_TEAMS[id]?.name}
-                          <span style={{fontSize:9,color:isQ?"#10b981":"#94a3b8",marginLeft:3,fontFamily:"monospace"}}>({gLetter})</span>
+                          <span style={{fontSize:9,color:isQ?"#10b981":"#cbd5e1",marginLeft:3,fontFamily:"monospace",fontWeight:600}}>({gLetter})</span>
                         </span>
-                        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1,flexShrink:0}}>
-                          <span style={{fontSize:10,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace"}}>{tData.pts}P</span>
-                          <span style={{fontSize:9,fontWeight:600,color:tData.gd>=0?"#2563eb":"#dc2626",fontFamily:"monospace"}}>
+                        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
+                          <span style={{fontSize:10.5,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",background:isQ?"rgba(16,185,129,0.1)":"#f1f5f9",padding:"1px 5px",borderRadius:4}}>{tData.pts}P</span>
+                          <span style={{fontSize:10,fontWeight:700,color:tData.gd>=0?"#1d4ed8":"#dc2626",fontFamily:"monospace",minWidth:32,textAlign:"right"}}>
                             {tData.gd >= 0 ? `+${tData.gd}` : tData.gd}AV
                           </span>
                         </div>
@@ -932,24 +949,27 @@ export default function App() {
                 </div>
               </div>
             </div>
-            {/* Bracket Wrapper */}
-            <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px",boxShadow:"0 4px 12px rgba(0,0,0,0.03)",overflowX:"auto"}}>
-              <div style={{display:"flex", justifyContent:"space-between", gap:"8px", textAlign:"center", borderBottom:"2px solid #f1f5f9", paddingBottom:10, marginBottom:14, width:"100%"}}>
-                {[["SON 32","#64748b"],["SON 16","#64748b"],["ÇEYREK F.","#374151"],["YARI F.","#374151"],null,["YARI F.","#374151"],["ÇEYREK F.","#374151"],["SON 16","#64748b"],["SON 32","#64748b"]].map((item, i) => 
+            {/* Bracket Wrapper - premium dark header */}
+            <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.04)"}}>
+              {/* Stage labels bar */}
+              <div style={{background:"#0a0f1e",padding:"10px 14px",display:"flex",justifyContent:"space-between",gap:"8px",alignItems:"center"}}>
+                {[["SON 32","rgba(255,255,255,0.4)"],["SON 16","rgba(255,255,255,0.5)"],["ÇEYREK F.","rgba(255,255,255,0.65)"],["YARI F.","rgba(255,255,255,0.8)"],null,["YARI F.","rgba(255,255,255,0.8)"],["ÇEYREK F.","rgba(255,255,255,0.65)"],["SON 16","rgba(255,255,255,0.5)"],["SON 32","rgba(255,255,255,0.4)"]].map((item, i) => 
                   item === null ? (
-                    <div key={i} style={{width:"230px",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                      <span style={{fontSize:8,fontWeight:900,color:"#d97706",letterSpacing:"0.12em",textTransform:"uppercase"}}>⚽</span>
-                      <span style={{fontSize:10.5,fontWeight:900,color:"#b45309",letterSpacing:"0.06em",textTransform:"uppercase"}}>PODYUM MERKEZİ</span>
+                    <div key={i} style={{width:"230px",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                      <span style={{fontSize:9.5,fontWeight:900,color:"#f59e0b",letterSpacing:"0.1em",textTransform:"uppercase"}}>PODYUM MERKEZİ</span>
                     </div>
                   ) : (
-                    <div key={i} style={{flex:"1 1 0%",maxWidth:"135px",fontSize:9.5,fontWeight:900,color:item[1],letterSpacing:"0.09em",textTransform:"uppercase",padding:"2px 0"}}>
+                    <div key={i} style={{flex:"1 1 0%",maxWidth:"135px",fontSize:9,fontWeight:700,color:item[1],letterSpacing:"0.1em",textTransform:"uppercase",textAlign:"center"}}>
                       {item[0]}
                     </div>
                   )
                 )}
               </div>
-              <div style={{width:"100%"}}>
-                <BracketView bracket={bracket} knockoutScores={knockoutScores} />
+              <div style={{padding:"14px",overflowX:"auto"}}>
+                <div style={{width:"100%"}}>
+                  <BracketView bracket={bracket} knockoutScores={knockoutScores} />
+                </div>
               </div>
             </div>
           </div>
@@ -1086,67 +1106,96 @@ export default function App() {
         )}
 
         {/* === MATRIX TAB === */}
-        {activeTab==="matrix" && simResults && (
-          <div style={{background:"var(--bg-card)",border:"1px solid #e2e8f0",borderRadius:16,overflow:"hidden",boxShadow:"0 6px 24px rgba(0,0,0,0.04)"}}>
-            {/* Table Header Banner */}
-            <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",padding:"14px 20px",display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:4,height:28,background:"linear-gradient(180deg,#10b981,#059669)",borderRadius:2}}></div>
-              <div>
-                <div style={{fontSize:13,fontWeight:900,color:"#ffffff",letterSpacing:"0.04em"}}>OLASALIK MATRİSİ</div>
-                <div style={{fontSize:10,color:"#94a3b8",fontFamily:"monospace",fontWeight:600,marginTop:1,letterSpacing:"0.06em"}}>10,000× MONTE CARLO SİMÜLASYONU</div>
+        {activeTab==="matrix" && simResults && (() => {
+          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a,b)=>(simResults.teams[b]?.champion??0)-(simResults.teams[a]?.champion??0));
+          const half = Math.ceil(sortedIds.length / 2);
+          const leftIds = sortedIds.slice(0, half);
+          const rightIds = sortedIds.slice(half);
+          const maxChamp = simResults.teams[sortedIds[0]]?.champion ?? 1;
+
+          const thCls = (color) => ({padding:"7px 8px",textAlign:"center",fontWeight:800,fontSize:10,color,letterSpacing:"0.04em",textTransform:"uppercase",whiteSpace:"nowrap",background:"#0a0f1e",borderBottom:"2px solid rgba(255,255,255,0.08)"});
+          const tdCls = (color, bold) => ({padding:"6px 8px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:bold?700:600,color,fontSize:11.5,whiteSpace:"nowrap"});
+
+          const MatrixTable = ({ids, offset}) => (
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead style={{position:"sticky",top:0,zIndex:20}}>
+                <tr>
+                  <th style={{...thCls("rgba(255,255,255,0.5)"),textAlign:"left",padding:"7px 10px",minWidth:130}}>Takım</th>
+                  <th style={thCls("#10b981")}>S32</th>
+                  <th style={thCls("rgba(255,255,255,0.6)")}>S16</th>
+                  <th style={thCls("rgba(255,255,255,0.7)")}>ÇF</th>
+                  <th style={thCls("#38bdf8")}>YF</th>
+                  <th style={thCls("#a78bfa")}>F</th>
+                  <th style={{...thCls("#f59e0b"),minWidth:80}}>
+                    <svg style={{verticalAlign:"middle",marginRight:3}} width="9" height="9" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    ŞAMPİYON
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {ids.map((id, i) => {
+                  const t = simResults.teams[id] || {};
+                  const champPct = t.champion ?? 0;
+                  const rowIdx = offset + i;
+                  const isTop3 = rowIdx < 3;
+                  return (
+                    <tr key={id}
+                      style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"#ffffff":"#fafbfc",transition:"background 0.12s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,0.04)"}
+                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#ffffff":"#fafbfc"}>
+                      <td style={{padding:"6px 10px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:7}}>
+                          <span style={{fontSize:10,fontFamily:"monospace",color:"#94a3b8",fontWeight:700,minWidth:18,textAlign:"right"}}>{rowIdx+1}</span>
+                          <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",boxShadow:"0 1px 2px rgba(0,0,0,0.1)",flexShrink:0}} alt="" />
+                          <span style={{fontWeight:700,color:"#0f172a",fontSize:12,whiteSpace:"nowrap"}}>{INITIAL_TEAMS[id]?.name}</span>
+                        </div>
+                      </td>
+                      <td style={tdCls("#059669",true)}>{(t.r32??0).toFixed(1)}%</td>
+                      <td style={tdCls("#374151",false)}>{(t.r16??0).toFixed(1)}%</td>
+                      <td style={tdCls("#374151",false)}>{(t.qf??0).toFixed(1)}%</td>
+                      <td style={tdCls("#0284c7",true)}>{(t.sf??0).toFixed(1)}%</td>
+                      <td style={tdCls("#7c3aed",true)}>{(t.f??0).toFixed(1)}%</td>
+                      <td style={{padding:"6px 8px",background:"rgba(217,119,6,0.02)"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:5}}>
+                          <div style={{width:36,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                            <div style={{width:`${Math.min(100,(champPct/maxChamp)*100)}%`,height:"100%",background:isTop3?"linear-gradient(90deg,#d97706,#f59e0b)":"linear-gradient(90deg,#94a3b8,#cbd5e1)",borderRadius:2}}></div>
+                          </div>
+                          <span style={{fontFamily:"monospace",fontWeight:900,color:isTop3?"#b45309":"#374151",fontSize:12,minWidth:38,textAlign:"right"}}>{champPct.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          );
+
+          return (
+            <div style={{display:"flex",flexDirection:"column",gap:0,borderRadius:16,overflow:"hidden",boxShadow:"0 6px 24px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
+              {/* Header */}
+              <div style={{background:"#0a0f1e",padding:"12px 18px",display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:3,height:24,background:"linear-gradient(180deg,#10b981,#059669)",borderRadius:2}}></div>
+                <div>
+                  <div style={{fontSize:12.5,fontWeight:900,color:"#ffffff",letterSpacing:"0.06em",fontFamily:"'Inter',system-ui"}}>OLASILIK MATRİSİ</div>
+                  <div style={{fontSize:9,color:"#475569",fontFamily:"monospace",fontWeight:600,marginTop:1,letterSpacing:"0.08em"}}>10,000× MONTE CARLO SİMÜLASYONU</div>
+                </div>
+                <div style={{marginLeft:"auto",display:"flex",gap:16,alignItems:"center"}}>
+                  {[["S32","Son 32"],["S16","Son 16"],["ÇF","Çeyrek"],["YF","Yarı F."],["F","Final"]].map(([k,v])=>(
+                    <div key={k} style={{fontSize:9,color:"rgba(255,255,255,0.4)",fontFamily:"monospace"}}>
+                      <span style={{color:"rgba(255,255,255,0.7)",fontWeight:700}}>{k}</span> = {v}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Dual column tables */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1px 1fr",background:"#ffffff"}}>
+                <div style={{overflowX:"auto"}}><MatrixTable ids={leftIds} offset={0} /></div>
+                <div style={{background:"#e2e8f0"}}></div>
+                <div style={{overflowX:"auto"}}><MatrixTable ids={rightIds} offset={half} /></div>
               </div>
             </div>
-            <div style={{overflowY:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead style={{position:"sticky",top:0,zIndex:20}}>
-                  <tr style={{background:"#f8fafc",borderBottom:"2px solid #e2e8f0"}}>
-                    <th style={{padding:"13px 18px",textAlign:"left",fontWeight:800,fontSize:12,color:"#374151",letterSpacing:"0.02em"}}>Ülke / Takım</th>
-                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#047857",letterSpacing:"0.03em"}}>Son 32</th>
-                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#374151",letterSpacing:"0.03em"}}>Son 16</th>
-                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#374151",letterSpacing:"0.03em"}}>Çeyrek Final</th>
-                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#0891b2",letterSpacing:"0.03em"}}>Yarı Final</th>
-                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#0e7490",letterSpacing:"0.03em"}}>Bronz</th>
-                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#4f46e5",letterSpacing:"0.03em"}}>Final</th>
-                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:900,fontSize:11.5,color:"#b45309",letterSpacing:"0.03em",background:"rgba(217,119,6,0.04)"}}>🏆 Şampiyon</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(INITIAL_TEAMS).sort((a,b)=>(simResults.teams[b]?.champion??0)-(simResults.teams[a]?.champion??0)).map((id,rowIdx)=>{
-                    const t=simResults.teams[id]||{};
-                    const champPct = t.champion??0;
-                    return (
-                      <tr key={id} style={{borderBottom:"1px solid #f1f5f9",background:rowIdx%2===0?"#ffffff":"#fafbfc"}}
-                        onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,0.03)"}
-                        onMouseLeave={e=>e.currentTarget.style.background=rowIdx%2===0?"#ffffff":"#fafbfc"}>
-                        <td style={{padding:"11px 18px"}}>
-                          <div style={{display:"flex",alignItems:"center",gap:10}}>
-                            <span style={{fontSize:11,fontFamily:"monospace",color:"#94a3b8",fontWeight:700,minWidth:20,textAlign:"right"}}>{rowIdx+1}</span>
-                            <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:20,height:14,borderRadius:3,objectFit:"cover",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
-                            <span style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{INITIAL_TEAMS[id]?.name}</span>
-                          </div>
-                        </td>
-                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",fontWeight:700,color:"#047857",fontSize:13}}>{(t.r32??0).toFixed(1)}%</td>
-                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#334155",fontWeight:600,fontSize:13}}>{(t.r16??0).toFixed(1)}%</td>
-                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#334155",fontWeight:600,fontSize:13}}>{(t.qf??0).toFixed(1)}%</td>
-                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#0891b2",fontWeight:700,fontSize:13}}>{(t.sf??0).toFixed(1)}%</td>
-                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#0e7490",fontWeight:600,fontSize:13}}>{(t.thirdPlaceChamp??0).toFixed(1)}%</td>
-                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#4f46e5",fontWeight:700,fontSize:13}}>{(t.f??0).toFixed(1)}%</td>
-                        <td style={{padding:"11px 18px",textAlign:"center",background:"rgba(217,119,6,0.03)"}}>
-                          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                            <div style={{flex:1,maxWidth:60,height:5,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
-                              <div style={{width:`${Math.min(100,champPct/35*100)}%`,height:"100%",background:"linear-gradient(90deg,#d97706,#f59e0b)",borderRadius:3}}></div>
-                            </div>
-                            <span style={{fontFamily:"monospace",fontWeight:900,color:"#b45309",fontSize:14,minWidth:44,textAlign:"right"}}>{champPct.toFixed(1)}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* === ELO TAB === */}
         {activeTab==="elo" && (
