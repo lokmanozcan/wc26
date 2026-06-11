@@ -16,8 +16,8 @@ const CODE_MAP = {
   GH:  "GHA", PY:  "PAR", DZ:  "ALG", SA:  "KSA", TN:  "TUN",
   NZ:  "NZL", IQ:  "IRQ", HT:  "HAI", ZA:  "RSA", UZ:  "UZB",
   CD:  "COD", CV:  "CPV", BA:  "BIH", QA:  "QAT", CI:  "CIV",
-  CW:  "CUW", GB:  "SCO", // SCO için GB kullanıyor olabilir, ayrıca kontrol
-  SC:  "SCO", // alternatif
+  CW:  "CUW", CA:  "CAN",
+  SQ:  "SCO",
 };
 
 export default async function handler(req, res) {
