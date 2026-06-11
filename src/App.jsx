@@ -320,7 +320,7 @@ function BracketView({ bracket, knockoutScores }) {
     <div ref={containerRef} style={{ position:"relative", width:"100%", paddingTop:4 }}>
       {svgPaths.length > 0 && (
         <svg style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%", pointerEvents:"none", zIndex:5, overflow:"visible" }}>
-          {svgPaths.map((d,i) => <path key={i} d={d} fill="none" stroke="#94a3b8" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />)}
+          {svgPaths.map((d,i) => <path key={i} d={d} fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="none" />)}
         </svg>
       )}
 
@@ -896,48 +896,57 @@ export default function App() {
         {/* === BRACKET TAB === */}
         {activeTab==="bracket" && bracket && (
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {/* 6x2 Kusursuz Grid Alanı */}
-            <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(0,0,0,0.02)"}}>
-              <div className="groups-panel-grid">{renderGroups()}</div>
-            </div>
-            {/* Thirds */}
-            <div style={{background:"#ffffff",border:"1px dashed #10b981",borderRadius:12,padding:"10px 14px"}}>
-              <div style={{fontSize:11,fontWeight:900,color:"#047857",marginBottom:8,display:"flex",alignItems:"center",gap:6,fontFamily:"monospace",letterSpacing:"0.05em"}}>
-                <span>⏳</span> EN İYİ 3.LER ANLIK DURUM
+            {/* 4x3 Groups Grid + 3.ler Panel side by side */}
+            <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+              {/* Groups 4x3 */}
+              <div style={{flex:1,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(0,0,0,0.02)"}}>
+                <div className="groups-panel-grid">{renderGroups()}</div>
               </div>
-              <div className="thirds-grid">
-                {bracket.sortedThirds.map((id, index) => {
-                  const isQ = bracket.qualifiedThirds.includes(id);
-                  const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
-                  const tData = liveTableData.thirds.find(x => x.id === id) || { pts: 0, gd: 0 };
-                  return (
-                    <div key={id} className={`third-chip ${isQ ? "qualified" : "eliminated"}`}>
-                      <span style={{fontSize:9,fontWeight:700,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",flexShrink:0,width:12}}>{index+1}.</span>
-                      <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:14,height:10,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
-                      <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:11}}>
-                        {INITIAL_TEAMS[id]?.name}<span style={{fontSize:9,color:"#64748b",marginLeft:2}}>{gLetter ? `(${gLetter})` : ""}</span>
-                      </span>
-                      <span style={{fontSize:10,fontWeight:700,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",flexShrink:0}}>{tData.pts}P</span>
-                      <span style={{fontSize:10,fontWeight:600,color:tData.gd>=0?"#2563eb":"#dc2626",fontFamily:"monospace",flexShrink:0}}>
-                        {tData.gd >= 0 ? `+${tData.gd}` : tData.gd}AV
-                      </span>
-                    </div>
-                  );
-                })}
+              {/* Thirds Panel - right side */}
+              <div style={{width:200,flexShrink:0,background:"#ffffff",border:"1px solid #d1fae5",borderLeft:"3px solid #10b981",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(16,185,129,0.06)"}}>
+                <div style={{fontSize:10,fontWeight:900,color:"#047857",marginBottom:10,display:"flex",alignItems:"center",gap:5,fontFamily:"monospace",letterSpacing:"0.06em",textTransform:"uppercase"}}>
+                  <span style={{fontSize:13}}>⏳</span> En İyi 3.ler
+                </div>
+                <div className="thirds-grid">
+                  {bracket.sortedThirds.map((id, index) => {
+                    const isQ = bracket.qualifiedThirds.includes(id);
+                    const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
+                    const tData = liveTableData.thirds.find(x => x.id === id) || { pts: 0, gd: 0 };
+                    return (
+                      <div key={id} className={`third-chip ${isQ ? "qualified" : "eliminated"}`}>
+                        <span style={{fontSize:9,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",flexShrink:0,minWidth:14}}>{index+1}.</span>
+                        <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:15,height:11,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
+                        <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:11.5,fontWeight:600}}>
+                          {INITIAL_TEAMS[id]?.name}
+                          <span style={{fontSize:9,color:isQ?"#10b981":"#94a3b8",marginLeft:3,fontFamily:"monospace"}}>({gLetter})</span>
+                        </span>
+                        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1,flexShrink:0}}>
+                          <span style={{fontSize:10,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace"}}>{tData.pts}P</span>
+                          <span style={{fontSize:9,fontWeight:600,color:tData.gd>=0?"#2563eb":"#dc2626",fontFamily:"monospace"}}>
+                            {tData.gd >= 0 ? `+${tData.gd}` : tData.gd}AV
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             {/* Bracket Wrapper */}
             <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px",boxShadow:"0 4px 12px rgba(0,0,0,0.03)",overflowX:"auto"}}>
-              <div style={{display:"flex", justifyContent:"space-between", gap:"8px", textAlign:"center", fontSize:10, fontWeight:900, color:"#64748b", letterSpacing:"0.08em", borderBottom:"1px solid #e2e8f0", paddingBottom:8, marginBottom:12, width:"100%"}}>
-                <div style={{flex:"1 1 0%", maxWidth:"135px"}}>SON 32</div>
-                <div style={{flex:"1 1 0%", maxWidth:"135px"}}>SON 16</div>
-                <div style={{flex:"1 1 0%", maxWidth:"135px"}}>ÇEYREK F.</div>
-                <div style={{flex:"1 1 0%", maxWidth:"135px"}}>YARI F.</div>
-                <div style={{width:"230px", color:"#b45309", flexShrink:0}}>PODYUM MERKEZİ</div>
-                <div style={{flex:"1 1 0%", maxWidth:"135px"}}>YARI F.</div>
-                <div style={{flex:"1 1 0%", maxWidth:"135px"}}>ÇEYREK F.</div>
-                <div style={{flex:"1 1 0%", maxWidth:"135px"}}>SON 16</div>
-                <div style={{flex:"1 1 0%", maxWidth:"135px"}}>SON 32</div>
+              <div style={{display:"flex", justifyContent:"space-between", gap:"8px", textAlign:"center", borderBottom:"2px solid #f1f5f9", paddingBottom:10, marginBottom:14, width:"100%"}}>
+                {[["SON 32","#64748b"],["SON 16","#64748b"],["ÇEYREK F.","#374151"],["YARI F.","#374151"],null,["YARI F.","#374151"],["ÇEYREK F.","#374151"],["SON 16","#64748b"],["SON 32","#64748b"]].map((item, i) => 
+                  item === null ? (
+                    <div key={i} style={{width:"230px",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                      <span style={{fontSize:8,fontWeight:900,color:"#d97706",letterSpacing:"0.12em",textTransform:"uppercase"}}>⚽</span>
+                      <span style={{fontSize:10.5,fontWeight:900,color:"#b45309",letterSpacing:"0.06em",textTransform:"uppercase"}}>PODYUM MERKEZİ</span>
+                    </div>
+                  ) : (
+                    <div key={i} style={{flex:"1 1 0%",maxWidth:"135px",fontSize:9.5,fontWeight:900,color:item[1],letterSpacing:"0.09em",textTransform:"uppercase",padding:"2px 0"}}>
+                      {item[0]}
+                    </div>
+                  )
+                )}
               </div>
               <div style={{width:"100%"}}>
                 <BracketView bracket={bracket} knockoutScores={knockoutScores} />
@@ -1078,39 +1087,58 @@ export default function App() {
 
         {/* === MATRIX TAB === */}
         {activeTab==="matrix" && simResults && (
-          <div style={{background:"var(--bg-card)",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 4px 12px rgba(0,0,0,0.03)"}}>
+          <div style={{background:"var(--bg-card)",border:"1px solid #e2e8f0",borderRadius:16,overflow:"hidden",boxShadow:"0 6px 24px rgba(0,0,0,0.04)"}}>
+            {/* Table Header Banner */}
+            <div style={{background:"linear-gradient(135deg,#0f172a 0%,#1e293b 100%)",padding:"14px 20px",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:4,height:28,background:"linear-gradient(180deg,#10b981,#059669)",borderRadius:2}}></div>
+              <div>
+                <div style={{fontSize:13,fontWeight:900,color:"#ffffff",letterSpacing:"0.04em"}}>OLASALIK MATRİSİ</div>
+                <div style={{fontSize:10,color:"#94a3b8",fontFamily:"monospace",fontWeight:600,marginTop:1,letterSpacing:"0.06em"}}>10,000× MONTE CARLO SİMÜLASYONU</div>
+              </div>
+            </div>
             <div style={{overflowY:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12.5}}>
-                <thead style={{position:"sticky",top:0,background:"#f8fafc",zIndex:20}}>
-                  <tr style={{borderBottom:"2px solid #e2e8f0",color:"#475569"}}>
-                    <th style={{padding:"11px 14px",textAlign:"left",fontWeight:800}}>Ülke / Takım</th>
-                    <th style={{padding:"11px 14px",textAlign:"center",color:"#047857",fontWeight:800}}>Son 32</th>
-                    <th style={{padding:"11px 14px",textAlign:"center",fontWeight:800}}>Son 16</th>
-                    <th style={{padding:"11px 14px",textAlign:"center",fontWeight:800}}>Çeyrek Final</th>
-                    <th style={{padding:"11px 14px",textAlign:"center",color:"#0891b2",fontWeight:800}}>Yarı Final</th>
-                    <th style={{padding:"11px 14px",textAlign:"center",color:"#09748e",fontWeight:800}}>Bronz</th>
-                    <th style={{padding:"11px 14px",textAlign:"center",color:"#4f46e5",fontWeight:800}}>Final</th>
-                    <th style={{padding:"11px 14px",textAlign:"center",color:"#b45309",fontWeight:800}}>Şampiyon</th>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead style={{position:"sticky",top:0,zIndex:20}}>
+                  <tr style={{background:"#f8fafc",borderBottom:"2px solid #e2e8f0"}}>
+                    <th style={{padding:"13px 18px",textAlign:"left",fontWeight:800,fontSize:12,color:"#374151",letterSpacing:"0.02em"}}>Ülke / Takım</th>
+                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#047857",letterSpacing:"0.03em"}}>Son 32</th>
+                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#374151",letterSpacing:"0.03em"}}>Son 16</th>
+                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#374151",letterSpacing:"0.03em"}}>Çeyrek Final</th>
+                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#0891b2",letterSpacing:"0.03em"}}>Yarı Final</th>
+                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#0e7490",letterSpacing:"0.03em"}}>Bronz</th>
+                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:800,fontSize:11.5,color:"#4f46e5",letterSpacing:"0.03em"}}>Final</th>
+                    <th style={{padding:"13px 18px",textAlign:"center",fontWeight:900,fontSize:11.5,color:"#b45309",letterSpacing:"0.03em",background:"rgba(217,119,6,0.04)"}}>🏆 Şampiyon</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.keys(INITIAL_TEAMS).sort((a,b)=>(simResults.teams[b]?.champion??0)-(simResults.teams[a]?.champion??0)).map(id=>{
+                  {Object.keys(INITIAL_TEAMS).sort((a,b)=>(simResults.teams[b]?.champion??0)-(simResults.teams[a]?.champion??0)).map((id,rowIdx)=>{
                     const t=simResults.teams[id]||{};
+                    const champPct = t.champion??0;
                     return (
-                      <tr key={id} style={{borderBottom:"1px solid #edf2f7"}}
-                        onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,0.02)"}
-                        onMouseLeave={e=>e.currentTarget.style.background=""}>
-                        <td style={{padding:"9px 14px",display:"flex",alignItems:"center",gap:8}}>
-                          <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover"}} alt="" />
-                          <span style={{fontWeight:600,color:"#0f172a"}}>{INITIAL_TEAMS[id]?.name}</span>
+                      <tr key={id} style={{borderBottom:"1px solid #f1f5f9",background:rowIdx%2===0?"#ffffff":"#fafbfc"}}
+                        onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,0.03)"}
+                        onMouseLeave={e=>e.currentTarget.style.background=rowIdx%2===0?"#ffffff":"#fafbfc"}>
+                        <td style={{padding:"11px 18px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <span style={{fontSize:11,fontFamily:"monospace",color:"#94a3b8",fontWeight:700,minWidth:20,textAlign:"right"}}>{rowIdx+1}</span>
+                            <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:20,height:14,borderRadius:3,objectFit:"cover",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
+                            <span style={{fontWeight:700,color:"#0f172a",fontSize:13}}>{INITIAL_TEAMS[id]?.name}</span>
+                          </div>
                         </td>
-                        <td style={{padding:"9px 14px",textAlign:"center",fontFamily:"monospace",fontWeight:700,color:"#047857"}}>{(t.r32??0).toFixed(1)}%</td>
-                        <td style={{padding:"9px 14px",textAlign:"center",fontFamily:"monospace",color:"#334155",fontWeight:600}}>{(t.r16??0).toFixed(1)}%</td>
-                        <td style={{padding:"9px 14px",textAlign:"center",fontFamily:"monospace",color:"#334155",fontWeight:600}}>{(t.qf??0).toFixed(1)}%</td>
-                        <td style={{padding:"9px 14px",textAlign:"center",fontFamily:"monospace",color:"#0891b2",fontWeight:600}}>{(t.sf??0).toFixed(1)}%</td>
-                        <td style={{padding:"9px 14px",textAlign:"center",fontFamily:"monospace",color:"#09748e",fontWeight:600}}>{(t.thirdPlaceChamp??0).toFixed(1)}%</td>
-                        <td style={{padding:"9px 14px",textAlign:"center",fontFamily:"monospace",color:"#4f46e5",fontWeight:700}}>{(t.f??0).toFixed(1)}%</td>
-                        <td style={{padding:"9px 14px",textAlign:"center",fontFamily:"monospace",fontWeight:900,color:"#b45309",background:"rgba(217,119,6,0.02)"}}>{(t.champion??0).toFixed(1)}%</td>
+                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",fontWeight:700,color:"#047857",fontSize:13}}>{(t.r32??0).toFixed(1)}%</td>
+                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#334155",fontWeight:600,fontSize:13}}>{(t.r16??0).toFixed(1)}%</td>
+                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#334155",fontWeight:600,fontSize:13}}>{(t.qf??0).toFixed(1)}%</td>
+                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#0891b2",fontWeight:700,fontSize:13}}>{(t.sf??0).toFixed(1)}%</td>
+                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#0e7490",fontWeight:600,fontSize:13}}>{(t.thirdPlaceChamp??0).toFixed(1)}%</td>
+                        <td style={{padding:"11px 18px",textAlign:"center",fontFamily:"monospace",color:"#4f46e5",fontWeight:700,fontSize:13}}>{(t.f??0).toFixed(1)}%</td>
+                        <td style={{padding:"11px 18px",textAlign:"center",background:"rgba(217,119,6,0.03)"}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                            <div style={{flex:1,maxWidth:60,height:5,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
+                              <div style={{width:`${Math.min(100,champPct/35*100)}%`,height:"100%",background:"linear-gradient(90deg,#d97706,#f59e0b)",borderRadius:3}}></div>
+                            </div>
+                            <span style={{fontFamily:"monospace",fontWeight:900,color:"#b45309",fontSize:14,minWidth:44,textAlign:"right"}}>{champPct.toFixed(1)}%</span>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
