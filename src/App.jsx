@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { getFifaTargetThird } from "./fifaMatrix"; 
+import { getFifaTargetThird } from "./fifaMatrix";
+import { usePersistentState } from "./usePersistentState";
 
 
 // --- TAKIM VERİLERİ ---
@@ -428,7 +429,7 @@ function BracketView({ bracket, knockoutScores }) {
 }
 
 // === Eleme Skor Giriş Satırı ===
-function KOMatchRow({ m, score, onChange }) {
+function KOMatchRow({ m, score, officialScore, onChange, onConfirmOfficial, onClearOfficial }) {
   if (!m?.idA || !m?.idB) return null;
   const key = `ko_${[m.idA,m.idB].sort().join("_")}`;
   const homeId = m.idA; const awayId = m.idB;
@@ -438,8 +439,19 @@ function KOMatchRow({ m, score, onChange }) {
   const homeVal = rawScore ? (m.idA === storedA ? rawScore.home : rawScore.away) : "";
   const awayVal = rawScore ? (m.idA === storedA ? rawScore.away : rawScore.home) : "";
 
+  const offRaw = officialScore;
+  const offHome = offRaw ? (m.idA === storedA ? offRaw.home : offRaw.away) : "";
+  const offAway = offRaw ? (m.idA === storedA ? offRaw.away : offRaw.home) : "";
+
   const hasScore = homeVal !== "" && awayVal !== "" && homeVal !== undefined && awayVal !== undefined;
-  const sw = hasScore ? (parseInt(homeVal) > parseInt(awayVal) ? homeId : (parseInt(awayVal) > parseInt(homeVal) ? awayId : homeId)) : null;
+  const hasOfficial = offHome !== "" && offAway !== "" && offHome !== undefined && offAway !== undefined;
+  const isPrediction = hasScore && !hasOfficial;
+
+  // Gösterim için hangi skoru kullanıyoruz
+  const displayHome = hasOfficial ? offHome : homeVal;
+  const displayAway = hasOfficial ? offAway : awayVal;
+
+  const sw = (displayHome !== "" && displayAway !== "") ? (parseInt(displayHome) > parseInt(displayAway) ? homeId : (parseInt(displayAway) > parseInt(displayHome) ? awayId : homeId)) : null;
 
   const handleChange = (side, val) => {
     const sorted = [m.idA, m.idB].sort();
@@ -452,7 +464,11 @@ function KOMatchRow({ m, score, onChange }) {
   };
 
   return (
-    <div className="fixture-row-container" style={{ background: hasScore ? "rgba(16,185,129,0.04)" : "#ffffff", border:`1px solid ${hasScore ? "#10b981" : "#cbd5e1"}`, boxShadow:"0 1px 3px rgba(0,0,0,0.02)" }}>
+    <div className="fixture-row-container" style={{
+      background: hasOfficial ? "rgba(16,185,129,0.06)" : (isPrediction ? "rgba(251,191,36,0.04)" : "#ffffff"),
+      border:`1px solid ${hasOfficial ? "#10b981" : (isPrediction ? "rgba(251,191,36,0.5)" : "#cbd5e1")}`,
+      boxShadow:"0 1px 3px rgba(0,0,0,0.02)"
+    }}>
       <div className="fixture-team-block home">
         <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", color: sw===homeId ? "#047857" : "var(--text-primary)", fontWeight: sw===homeId ? 700 : 500 }}>
           {INITIAL_TEAMS[homeId]?.name}
@@ -460,14 +476,20 @@ function KOMatchRow({ m, score, onChange }) {
         <img src={getFlagUrl(INITIAL_TEAMS[homeId]?.iso)} style={{ width:16,height:11,borderRadius:2,objectFit:"cover",flexShrink:0 }} alt="" />
       </div>
       
-      <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0, padding:"0 6px" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0, padding:"0 6px", position:"relative" }}>
         <input type="number" min="0" max="99" placeholder="-" value={homeVal ?? ""}
           onChange={e => handleChange("homeInput", e.target.value)}
-          style={{ width:32, height:24, background:"#fff", border:"1px solid #cbd5e1", borderRadius:5, textAlign:"center", color:"#047857", fontWeight:700, fontFamily:"monospace", fontSize:12, outline:"none" }} />
+          style={{ width:32, height:24, background: hasOfficial ? "#f0fdf4" : "#fff", border:`1px solid ${hasOfficial ? "#10b981" : "#cbd5e1"}`, borderRadius:5, textAlign:"center", color:"#047857", fontWeight:700, fontFamily:"monospace", fontSize:12, outline:"none" }} />
         <span style={{ color:"#94a3b8", fontWeight:700, fontSize:13 }}>:</span>
         <input type="number" min="0" max="99" placeholder="-" value={awayVal ?? ""}
           onChange={e => handleChange("awayInput", e.target.value)}
-          style={{ width:32, height:24, background:"#fff", border:"1px solid #cbd5e1", borderRadius:5, textAlign:"center", color:"#047857", fontWeight:700, fontFamily:"monospace", fontSize:12, outline:"none" }} />
+          style={{ width:32, height:24, background: hasOfficial ? "#f0fdf4" : "#fff", border:`1px solid ${hasOfficial ? "#10b981" : "#cbd5e1"}`, borderRadius:5, textAlign:"center", color:"#047857", fontWeight:700, fontFamily:"monospace", fontSize:12, outline:"none" }} />
+        {isPrediction && (
+          <span style={{position:"absolute", bottom:-11, left:"50%", transform:"translateX(-50%)", fontSize:"7.5px", color:"#d97706", fontWeight:800, fontFamily:"monospace", whiteSpace:"nowrap", letterSpacing:"0.02em"}}>TAH</span>
+        )}
+        {hasOfficial && (
+          <span style={{position:"absolute", bottom:-11, left:"50%", transform:"translateX(-50%)", fontSize:"7.5px", color:"#059669", fontWeight:800, fontFamily:"monospace", whiteSpace:"nowrap", letterSpacing:"0.02em"}}>RESMİ</span>
+        )}
       </div>
 
       <div className="fixture-team-block away">
@@ -476,7 +498,21 @@ function KOMatchRow({ m, score, onChange }) {
           {INITIAL_TEAMS[awayId]?.name}
         </span>
       </div>
-      {hasScore && (
+
+      {/* R butonu: tahmin varsa resmi olarak onayla */}
+      {isPrediction && (
+        <button
+          title="Resmi sonuç olarak kaydet"
+          onClick={() => onConfirmOfficial && onConfirmOfficial(key, rawScore)}
+          style={{background:"linear-gradient(135deg,#10b981,#059669)",border:"none",color:"#fff",cursor:"pointer",fontSize:10,padding:"2px 6px",flexShrink:0,fontWeight:900,borderRadius:5,letterSpacing:"0.05em",boxShadow:"0 1px 4px rgba(16,185,129,0.3)"}}>R</button>
+      )}
+      {/* Resmi sonuç iptal */}
+      {hasOfficial && (
+        <button onClick={() => onClearOfficial && onClearOfficial(key)}
+          style={{ background:"none", border:"none", color:"#ef4444", cursor:"pointer", fontSize:11, padding:"0 0 0 4px", flexShrink:0, fontWeight:700 }}>✕</button>
+      )}
+      {/* Sadece tahmin yoksa temizle */}
+      {hasScore && !hasOfficial && !isPrediction && (
         <button onClick={() => { onChange(key,"home",""); onChange(key,"away",""); }}
           style={{ background:"none", border:"none", color:"#ef4444", cursor:"pointer", fontSize:11, padding:"0 0 0 4px", flexShrink:0, fontWeight:700 }}>✕</button>
       )}
@@ -486,14 +522,20 @@ function KOMatchRow({ m, score, onChange }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("bracket");
-  const [userScores, setUserScores] = useState({});
-  const [knockoutScores, setKnockoutScores] = useState({});
-  const [simResults, setSimResults] = useState(null);
-  const [singleDisplayScores, setSingleDisplayScores] = useState({}); 
-  const [liveTableData, setLiveTableData] = useState({ groups: {}, thirds: [] }); // KESİN GERÇEK TABLO VERİSİ
-  const [customElo, setCustomElo] = useState(() =>
+
+  // --- DB'ye kaydedilen state'ler ---
+  const [userScores,      setUserScores,      dbLoaded]       = usePersistentState("userScores", {});
+  const [officialScores,  setOfficialScores]                  = usePersistentState("officialScores", {});
+  const [officialKOScores,setOfficialKOScores]                = usePersistentState("officialKOScores", {});
+  const [knockoutScores,  setKnockoutScores]                  = usePersistentState("knockoutScores", {});
+  const [customElo,       setCustomElo]                       = usePersistentState("customElo",
     Object.fromEntries(Object.entries(INITIAL_TEAMS).map(([k,v]) => [k, v.elo]))
   );
+
+  // --- Hesaplanan / geçici state'ler (DB'ye kaydedilmez) ---
+  const [simResults, setSimResults] = useState(null);
+  const [singleDisplayScores, setSingleDisplayScores] = useState({});
+  const [liveTableData, setLiveTableData] = useState({ groups: {}, thirds: [] });
   const [eloSearch, setEloSearch] = useState("");
   const [groupsSection, setGroupsSection] = useState("groups");
 
@@ -501,7 +543,7 @@ export default function App() {
     Object.entries(INITIAL_TEAMS).map(([k,v]) => [k, { ...v, elo: customElo[k] ?? v.elo }])
   );
 
-  // KESİN TABLO DURUMUNU HESAPLAYAN YAN ETKİ (Simüle skorlara ya da kullanıcı girişlerine göre tam sayılar üretir)
+  // KESİN TABLO DURUMUNU HESAPLAYAN YAN ETKİ (Resmi skorlara ya da simüle skorlara göre tam sayılar üretir)
   useEffect(() => {
     if (!simResults || !singleDisplayScores) return;
 
@@ -510,10 +552,16 @@ export default function App() {
 
     const fixtures = generateAllFixtures();
     fixtures.forEach(f => {
+      const officialSc = officialScores[f.id];
       const userSc = userScores[f.id];
       let hG = 0; let aG = 0;
 
-      if (userSc && userSc.home !== "" && userSc.away !== "") {
+      if (officialSc && officialSc.home !== "" && officialSc.away !== "") {
+        // Resmi sonuç (R tuşuyla onaylanmış) — kesin olarak kullan
+        hG = parseInt(officialSc.home) || 0;
+        aG = parseInt(officialSc.away) || 0;
+      } else if (userSc && userSc.home !== "" && userSc.away !== "") {
+        // Kullanıcı tahmini — tabloya yansıt (ama olasılıkları etkilemiyor)
         hG = parseInt(userSc.home) || 0;
         aG = parseInt(userSc.away) || 0;
       } else if (singleDisplayScores[f.id]) {
@@ -545,16 +593,16 @@ export default function App() {
     );
 
     setLiveTableData({ groups: groupsOutput, thirds: sortedThirds });
-  }, [userScores, singleDisplayScores, simResults]);
+  }, [userScores, officialScores, singleDisplayScores, simResults]);
 
   // Monte Carlo tetikleyici
   useEffect(() => {
-    const results = runAdvancedSimulation(activeTeams, userScores);
+    const results = runAdvancedSimulation(activeTeams, officialScores);
     setSimResults(results);
     if (results && results.displayScores) {
       setSingleDisplayScores(results.displayScores);
     }
-  }, [userScores, customElo]);
+  }, [officialScores, customElo]);
 
   const handleScoreChange = (fixtureId, side, value) => {
     setUserScores(prev => ({ ...prev, [fixtureId]: { ...prev[fixtureId], [side]: value } }));
@@ -563,7 +611,8 @@ export default function App() {
   const getKOWinner = (idA, idB) => {
     if (!idA || !idB) return null;
     const key = `ko_${[idA,idB].sort().join("_")}`;
-    const sc = knockoutScores[key];
+    // Önce resmi sonuca bak, yoksa knockoutScores'a
+    const sc = officialKOScores[key] || knockoutScores[key];
     if (!sc || sc.home === "" || sc.away === "" || sc.home === undefined || sc.away === undefined) return null;
     const sorted = [idA,idB].sort();
     const h = parseInt(sc.home), a = parseInt(sc.away);
@@ -591,7 +640,7 @@ export default function App() {
       Object.keys(teams).forEach(id => { points[id]=0; gd[id]=0; gf[id]=0; });
       
       fixtures.forEach(f => {
-        const saved = userScores[f.id];
+        const saved = officialScores[f.id]; // Sadece resmi onaylı skorlar simülasyonu kilitler
         let hG = 0; let aG = 0;
 
         if (saved && saved.home !== "" && saved.away !== "") {
@@ -787,6 +836,19 @@ export default function App() {
 
   const inputStyle = { width:32, height:24, background:"#fff", border:"1px solid #cbd5e1", borderRadius:5, textAlign:"center", color:"#047857", fontWeight:700, fontFamily:"monospace", fontSize:12, outline:"none", flexShrink:0 };
 
+  // DB yüklenene kadar splash göster
+  if (!dbLoaded) {
+    return (
+      <div style={{minHeight:"100vh",background:"var(--bg-deep)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+        <img src="https://upload.wikimedia.org/wikipedia/tr/1/19/2026_FIFA_D%C3%BCnya_Kupas%C4%B1.svg" style={{width:64,height:64,objectFit:"contain",opacity:0.8}} alt="" />
+        <div style={{fontSize:13,fontWeight:700,color:"#64748b",fontFamily:"monospace",letterSpacing:"0.1em"}}>VERİTABANINDAN YÜKLENİYOR...</div>
+        <div style={{width:180,height:4,background:"#e2e8f0",borderRadius:4,overflow:"hidden"}}>
+          <div style={{height:"100%",background:"linear-gradient(90deg,#10b981,#059669)",borderRadius:4,animation:"shimmer 1.2s ease-in-out infinite",width:"60%"}} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{minHeight:"100vh",background:"var(--bg-deep)",color:"var(--text-primary)",fontFamily:"system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
       {/* HEADER */}
@@ -885,19 +947,22 @@ export default function App() {
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
                       {allFixtures.filter(f=>f.group===gName).map(f=>{
                         const userSc=userScores[f.id]; 
+                        const officialSc=officialScores[f.id];
+                        const hasOfficialScore=officialSc&&officialSc.home!==""&&officialSc.away!=="";
                         const hasUserScore=userSc&&userSc.home!==""&&userSc.away!=="";
+                        const isPrediction=hasUserScore&&!hasOfficialScore;
                         
-                        const activeHomeScore = hasUserScore ? userSc.home : (singleDisplayScores[f.id]?.home ?? "");
-                        const activeAwayScore = hasUserScore ? userSc.away : (singleDisplayScores[f.id]?.away ?? "");
-                        const isSimulated = !hasUserScore && activeHomeScore !== "";
+                        const activeHomeScore = hasOfficialScore ? officialSc.home : (hasUserScore ? userSc.home : (singleDisplayScores[f.id]?.home ?? ""));
+                        const activeAwayScore = hasOfficialScore ? officialSc.away : (hasUserScore ? userSc.away : (singleDisplayScores[f.id]?.away ?? ""));
+                        const isSimulated = !hasUserScore && !hasOfficialScore && activeHomeScore !== "";
 
                         const sw=activeHomeScore!==""&&activeAwayScore!=="" ? (parseInt(activeHomeScore)>parseInt(activeAwayScore)?"home":parseInt(activeAwayScore)>parseInt(activeHomeScore)?"away":"draw"):null;
                         
                         return (
                           <div key={f.id} className="fixture-row-container" 
                                style={{
-                                 background: hasUserScore ? "rgba(16,185,129,0.04)" : (isSimulated ? "rgba(59,130,246,0.02)" : "#f8fafc"), 
-                                 border:`1px solid ${hasUserScore ? "#10b981" : (isSimulated ? "rgba(59,130,246,0.25)" : "#cbd5e1")}`
+                                 background: hasOfficialScore ? "rgba(16,185,129,0.06)" : (isPrediction ? "rgba(251,191,36,0.04)" : (isSimulated ? "rgba(59,130,246,0.02)" : "#f8fafc")), 
+                                 border:`1px solid ${hasOfficialScore ? "#10b981" : (isPrediction ? "rgba(251,191,36,0.5)" : (isSimulated ? "rgba(59,130,246,0.25)" : "#cbd5e1"))}`
                                }}>
                             <div className="fixture-team-block home">
                               <span style={{overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", color:sw==="home"||sw==="draw"?"#047857":"var(--text-primary)", fontWeight:sw==="home"||sw==="draw"?700:500}}>{INITIAL_TEAMS[f.home]?.name}</span>
@@ -909,10 +974,32 @@ export default function App() {
                               {isSimulated && (
                                 <span style={{position:"absolute", bottom:-11, left:"50%", transform:"translateX(-50%)", fontSize:"7.5px", color:"#3b82f6", fontWeight:800, fontFamily:"monospace", whiteSpace:"nowrap", letterSpacing:"0.02em"}}>SIM</span>
                               )}
+                              {isPrediction && (
+                                <span style={{position:"absolute", bottom:-11, left:"50%", transform:"translateX(-50%)", fontSize:"7.5px", color:"#d97706", fontWeight:800, fontFamily:"monospace", whiteSpace:"nowrap", letterSpacing:"0.02em"}}>TAH</span>
+                              )}
+                              {hasOfficialScore && (
+                                <span style={{position:"absolute", bottom:-11, left:"50%", transform:"translateX(-50%)", fontSize:"7.5px", color:"#059669", fontWeight:800, fontFamily:"monospace", whiteSpace:"nowrap", letterSpacing:"0.02em"}}>RESMİ</span>
+                              )}
                             </div>
                             <div className="fixture-team-block away">
                               <span style={{overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", color:sw==="away"?"#047857":"var(--text-primary)", fontWeight:sw==="away"?700:500}}>{INITIAL_TEAMS[f.away]?.name}</span>
                             </div>
+                            {/* R butonu: tahmin varsa resmi olarak onayla */}
+                            {isPrediction && (
+                              <button
+                                title="Resmi sonuç olarak kaydet"
+                                onClick={() => {
+                                  setOfficialScores(prev => ({...prev, [f.id]: {home: userSc.home, away: userSc.away}}));
+                                }}
+                                style={{background:"linear-gradient(135deg,#10b981,#059669)",border:"none",color:"#fff",cursor:"pointer",fontSize:10,padding:"2px 6px",flexShrink:0,fontWeight:900,borderRadius:5,letterSpacing:"0.05em",boxShadow:"0 1px 4px rgba(16,185,129,0.3)"}}>R</button>
+                            )}
+                            {/* Resmi sonuç iptal butonu */}
+                            {hasOfficialScore && (
+                              <button onClick={() => {
+                                  setOfficialScores(prev => {const n={...prev};delete n[f.id];return n;});
+                                }}
+                                style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:11,padding:"0 0 0 4px",flexShrink:0,fontWeight:700}}>✕</button>
+                            )}
                           </div>
                         );
                       })}
@@ -947,7 +1034,14 @@ export default function App() {
                         const key=`ko_${[m.idA,m.idB].sort().join("_")}`;
                         return (
                           <KOMatchRow key={`${m.idA}_${m.idB}_${i}`} m={m} score={knockoutScores[key]}
-                            onChange={(k,side,val)=>setKnockoutScores(prev=>({...prev,[k]:{...prev[k],[side]:val}}))} />
+                            officialScore={officialKOScores[key]}
+                            onChange={(k,side,val)=>setKnockoutScores(prev=>({...prev,[k]:{...prev[k],[side]:val}}))}
+                            onConfirmOfficial={(k, sc) => {
+                              setOfficialKOScores(prev=>({...prev,[k]:sc}));
+                              setKnockoutScores(prev=>({...prev,[k]:sc}));
+                            }}
+                            onClearOfficial={(k) => setOfficialKOScores(prev=>{const n={...prev};delete n[k];return n;})}
+                          />
                         );
                       })}
                     </div>
