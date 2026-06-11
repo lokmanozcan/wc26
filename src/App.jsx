@@ -536,6 +536,37 @@ export default function App() {
   const [simResults, setSimResults] = useState(null);
   const [singleDisplayScores, setSingleDisplayScores] = useState({});
   const [liveTableData, setLiveTableData] = useState({ groups: {}, thirds: [] });
+
+  // --- ELO otomatik güncelleme (saatte bir) ---
+  useEffect(() => {
+    const fetchElo = async () => {
+      try {
+        const res = await fetch("/api/elo");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.elo && Object.keys(data.elo).length > 0) {
+          setCustomElo(prev => {
+            const next = { ...prev };
+            let changed = false;
+            Object.entries(data.elo).forEach(([code, rating]) => {
+              if (next[code] !== undefined && next[code] !== rating) {
+                next[code] = rating;
+                changed = true;
+              }
+            });
+            return changed ? next : prev;
+          });
+          console.log(`[ELO] ${data.count} takım güncellendi:`, data.updated);
+        }
+      } catch (e) {
+        console.warn("[ELO] Güncelleme başarısız:", e.message);
+      }
+    };
+
+    fetchElo(); // ilk açılışta hemen çek
+    const interval = setInterval(fetchElo, 60 * 60 * 1000); // saatte bir
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [eloSearch, setEloSearch] = useState("");
   const [groupsSection, setGroupsSection] = useState("groups");
 
