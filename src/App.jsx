@@ -528,7 +528,9 @@ export default function App() {
   const [officialScores,  setOfficialScores]                  = usePersistentState("officialScores", {});
   const [officialKOScores,setOfficialKOScores]                = usePersistentState("officialKOScores", {});
   const [knockoutScores,  setKnockoutScores]                  = usePersistentState("knockoutScores", {});
-  const [customElo,       setCustomElo]                       = usePersistentState("customElo",
+
+  // customElo DB'ye kaydedilmez — manuel değişiklikler + API güncellemesi birleşir
+  const [customElo, setCustomElo] = useState(() =>
     Object.fromEntries(Object.entries(INITIAL_TEAMS).map(([k,v]) => [k, v.elo]))
   );
 
@@ -545,17 +547,8 @@ export default function App() {
         if (!res.ok) return;
         const data = await res.json();
         if (data.elo && Object.keys(data.elo).length > 0) {
-          setCustomElo(prev => {
-            const next = { ...prev };
-            let changed = false;
-            Object.entries(data.elo).forEach(([code, rating]) => {
-              if (next[code] !== undefined && next[code] !== rating) {
-                next[code] = rating;
-                changed = true;
-              }
-            });
-            return changed ? next : prev;
-          });
+          // API'den gelen değerleri direkt yaz — manuel değişiklikler korunur, sadece API'dekiler güncellenir
+          setCustomElo(prev => ({ ...prev, ...data.elo }));
           console.log(`[ELO] ${data.count} takım güncellendi:`, data.updated);
         }
       } catch (e) {
@@ -563,10 +556,10 @@ export default function App() {
       }
     };
 
-    fetchElo(); // ilk açılışta hemen çek
-    const interval = setInterval(fetchElo, 60 * 60 * 1000); // saatte bir
+    fetchElo();
+    const interval = setInterval(fetchElo, 60 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   const [eloSearch, setEloSearch] = useState("");
   const [groupsSection, setGroupsSection] = useState("groups");
 
