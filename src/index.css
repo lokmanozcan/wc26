@@ -301,6 +301,22 @@ body {
   padding-left: 4px;
 }
 
+/* === THIRDS PANEL === */
+.thirds-panel {
+  width: 270px;
+}
+
+@media (max-width: 768px) {
+  .thirds-panel {
+    width: 100%;
+  }
+  .thirds-mobile-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+}
+
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -309,4 +325,71 @@ body {
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+/* === SCORE ENTRY GRID === */
+.score-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* === BRACKET TOP PANEL === */
+.bracket-top-panel {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* === DESKTOP NAV / HAMBURGER === */
+.desktop-nav { display: flex; }
+.hamburger-btn { display: none !important; }
+.hide-xs { display: inline; }
+.mobile-menu { display: none !important; }
+
+/* ============================================
+   TABLET — ≤ 1024px
+   ============================================ */
+@media (max-width: 1024px) {
+  .groups-panel-grid { grid-template-columns: repeat(3, 1fr); }
+  .score-entry-grid  { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ============================================
+   MOBILE — ≤ 768px
+   ============================================ */
+@media (max-width: 768px) {
+  /* Nav: hamburger açık */
+  .desktop-nav    { display: none !important; }
+  .hamburger-btn  { display: flex !important; }
+  .mobile-menu    { display: flex !important; }
+  .hide-xs        { display: none; }
+
+  /* Groups panel dikey */
+  .bracket-top-panel {
+    flex-direction: column;
+  }
+
+  /* Groups grid */
+  .groups-panel-grid  { grid-template-columns: repeat(2, 1fr); gap: 7px; }
+  .score-entry-grid   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  /* Group card daha kompakt */
+  .group-card { padding: 8px 9px; }
+
+  /* Bracket yatay scroll */
+  .bracket-scroll-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* ============================================
+   KÜÇÜK MOBİL — ≤ 480px
+   ============================================ */
+@media (max-width: 480px) {
+  .groups-panel-grid  { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .score-entry-grid   { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .group-card { padding: 7px 8px; }
+  .group-team-row { font-size: 11px; }
+  .match-card { padding: 4px 6px; }
+  .team-name  { font-size: 10px; }
+  .pct-badge  { font-size: 9.5px; }
 }

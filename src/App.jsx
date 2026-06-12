@@ -590,6 +590,7 @@ function KOMatchRow({ m, score, officialScore, onChange, onConfirmOfficial, onCl
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("bracket");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // --- DB'ye kaydedilen state'ler ---
   const [userScores,      setUserScores,      dbLoaded]       = usePersistentState("userScores", {});
@@ -987,40 +988,69 @@ export default function App() {
   return (
     <div style={{minHeight:"100vh",background:"var(--bg-deep)",color:"var(--text-primary)",fontFamily:"system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
       {/* HEADER */}
-      <header style={{height:62,background:"#0a0f1e",borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 16px rgba(0,0,0,0.3)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{position:"relative"}}>
-            <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#d97706,#f59e0b)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(217,119,6,0.4)"}}>
-              <img src={LOGO_URL} style={{width:26,height:26,objectFit:"contain"}} alt="Logo" />
-            </div>
+      <header style={{height:52,background:"#0a0f1e",borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:200,boxShadow:"0 2px 16px rgba(0,0,0,0.3)"}}>
+        {/* Logo + başlık */}
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:34,height:34,borderRadius:9,background:"linear-gradient(135deg,#d97706,#f59e0b)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 12px rgba(217,119,6,0.4)",flexShrink:0}}>
+            <img src={LOGO_URL} style={{width:22,height:22,objectFit:"contain"}} alt="Logo" />
           </div>
           <div>
-            <h1 style={{margin:0,fontSize:14.5,fontWeight:900,letterSpacing:"0.08em",textTransform:"uppercase",color:"#ffffff",fontFamily:"'Inter',system-ui,sans-serif"}}>
-              WORLDCUP<span style={{color:"#f59e0b"}}>'26</span> ANALYTICA
+            <h1 style={{margin:0,fontSize:13,fontWeight:900,letterSpacing:"0.07em",textTransform:"uppercase",color:"#ffffff",fontFamily:"'Inter',system-ui,sans-serif",lineHeight:1.2}}>
+              WORLDCUP<span style={{color:"#f59e0b"}}>'26</span> <span className="hide-xs">ANALYTICA</span>
             </h1>
-            <p style={{margin:0,fontSize:8.5,color:"#10b981",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:"0.18em"}}>10,000× MONTE CARLO LIVE PROJECTION</p>
+            <p style={{margin:0,fontSize:7.5,color:"#10b981",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,letterSpacing:"0.14em",lineHeight:1.3}} className="hide-xs">10,000× MONTE CARLO LIVE PROJECTION</p>
           </div>
         </div>
-        <nav style={{display:"flex",background:"rgba(255,255,255,0.06)",padding:4,borderRadius:12,border:"1px solid rgba(255,255,255,0.1)",gap:2}}>
+
+        {/* Desktop nav */}
+        <nav className="desktop-nav" style={{display:"flex",background:"rgba(255,255,255,0.06)",padding:3,borderRadius:11,border:"1px solid rgba(255,255,255,0.1)",gap:2}}>
           {[["bracket","Turnuva Ağacı"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["elo","ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>setActiveTab(tab)} className={`nav-btn ${activeTab===tab?"active":"inactive"}`}>{label}</button>
           ))}
         </nav>
+
+        {/* Mobile hamburger */}
+        <button
+          className="hamburger-btn"
+          onClick={()=>setMenuOpen(o=>!o)}
+          style={{display:"none",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:9,width:38,height:38,alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,flexDirection:"column",gap:5,padding:0}}
+          aria-label="Menü"
+        >
+          <span style={{display:"block",width:18,height:2,background: menuOpen?"#f59e0b":"rgba(255,255,255,0.8)",borderRadius:2,transition:"all 0.2s",transform: menuOpen?"rotate(45deg) translate(5px,5px)":"none"}}/>
+          <span style={{display:"block",width:18,height:2,background: menuOpen?"transparent":"rgba(255,255,255,0.8)",borderRadius:2,transition:"all 0.2s"}}/>
+          <span style={{display:"block",width:18,height:2,background: menuOpen?"#f59e0b":"rgba(255,255,255,0.8)",borderRadius:2,transition:"all 0.2s",transform: menuOpen?"rotate(-45deg) translate(5px,-5px)":"none"}}/>
+        </button>
       </header>
 
-      <main style={{flex:1,padding:"16px 16px 32px",maxWidth:"100%",width:"100%"}}>
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div className="mobile-menu" style={{position:"sticky",top:52,zIndex:190,background:"#0d1628",borderBottom:"1px solid rgba(255,255,255,0.10)",padding:"8px 12px",display:"flex",flexDirection:"column",gap:4,boxShadow:"0 8px 24px rgba(0,0,0,0.3)"}}>
+          {[["bracket","🏆 Turnuva Ağacı"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
+            <button key={tab} onClick={()=>{setActiveTab(tab);setMenuOpen(false);}}
+              style={{
+                width:"100%",textAlign:"left",padding:"11px 14px",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",border:"none",
+                background: activeTab===tab?"linear-gradient(135deg,#10b981,#059669)":"rgba(255,255,255,0.05)",
+                color: activeTab===tab?"#fff":"rgba(255,255,255,0.75)",
+                boxShadow: activeTab===tab?"0 2px 8px rgba(16,185,129,0.25)":"none",
+                transition:"all 0.15s"
+              }}>{label}</button>
+          ))}
+        </div>
+      )}
+
+      <main style={{flex:1,padding:"12px 12px 32px",maxWidth:"100%",width:"100%"}}>
 
         {/* === BRACKET TAB === */}
         {activeTab==="bracket" && bracket && (
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {/* 4x3 Groups Grid + 3.ler Panel side by side - SAME HEIGHT */}
-            <div style={{display:"flex",gap:12,alignItems:"stretch"}}>
+            {/* 4x3 Groups Grid + 3.ler Panel — mobilde dikey */}
+            <div className="bracket-top-panel">
               {/* Groups 4x3 */}
-              <div style={{flex:1,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
+              <div style={{flex:1,minWidth:0,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
                 <div className="groups-panel-grid">{renderGroups()}</div>
               </div>
               {/* Thirds Panel - right side, same height */}
-              <div style={{width:270,flexShrink:0,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
+              <div className="thirds-panel" style={{flexShrink:0,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
                 {/* Başlık + kolon etiketleri — grup kartlarıyla aynı stil */}
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -1032,7 +1062,7 @@ export default function App() {
                     <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
                   </div>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
+                <div className="thirds-mobile-grid" style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
                   {bracket.sortedThirds.map((id, index) => {
                     const isQ = bracket.qualifiedThirds.includes(id);
                     const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
@@ -1089,7 +1119,7 @@ export default function App() {
                   )
                 )}
               </div>
-              <div style={{padding:"14px",overflowX:"auto"}}>
+              <div className="bracket-scroll-wrapper" style={{padding:"14px",overflowX:"auto"}}>
                 <div style={{width:"100%"}}>
                   <BracketView bracket={bracket} knockoutScores={knockoutScores} />
                 </div>
@@ -1101,7 +1131,7 @@ export default function App() {
         {/* === SKOR GİRİŞİ TAB === */}
         {activeTab==="groups" && simResults && (
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
-            <div style={{display:"flex",gap:8,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:12,padding:5,alignSelf:"flex-start"}}>
+            <div style={{display:"flex",gap:8,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:12,padding:5,alignSelf:"flex-start",width:"100%",maxWidth:320}}>
               {[["groups","⚽ Grup Maçları"],["knockout","🏆 Eleme Maçları"]].map(([s,label])=>(
                 <button key={s} onClick={()=>setGroupsSection(s)}
                   style={{padding:"6px 18px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:"none",
@@ -1113,8 +1143,7 @@ export default function App() {
             </div>
 
             {groupsSection==="groups" && (
-              // YENİ: Her satırda tam 4 grup olacak şekilde optimize edilen grid yapısı
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4, minmax(0, 1fr))",gap:14}}>
+              <div className="score-entry-grid">
                 {Object.keys(GROUPS_CONFIG).map(gName=>(
                   <div key={gName} style={{background:"var(--bg-card)",border:"1px solid #e2e8f0",borderRadius:12,padding:14,boxShadow:"0 2px 4px rgba(0,0,0,0.02)"}}>
                     <div style={{fontSize:12,fontWeight:900,color:"#047857",borderBottom:"2px solid #e2e8f0",paddingBottom:6,marginBottom:10,letterSpacing:"0.05em"}}>
