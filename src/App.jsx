@@ -1259,20 +1259,29 @@ export default function App() {
 
         {/* === MATRIX TAB === */}
         {activeTab==="matrix" && simResults && (() => {
-          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a,b)=>(simResults.teams[b]?.champion??0)-(simResults.teams[a]?.champion??0));
+          // Çok kademeli sıralama: şampiyon → final → YF → ÇF → S16 → S32
+          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a,b) => {
+            const ta = simResults.teams[a] || {}, tb = simResults.teams[b] || {};
+            return (tb.champion??0)-(ta.champion??0)
+              || (tb.f??0)-(ta.f??0)
+              || (tb.sf??0)-(ta.sf??0)
+              || (tb.qf??0)-(ta.qf??0)
+              || (tb.r16??0)-(ta.r16??0)
+              || (tb.r32??0)-(ta.r32??0);
+          });
           const half = Math.ceil(sortedIds.length / 2);
           const leftIds = sortedIds.slice(0, half);
           const rightIds = sortedIds.slice(half);
           const maxChamp = simResults.teams[sortedIds[0]]?.champion ?? 1;
 
-          const thCls = (color) => ({padding:"7px 8px",textAlign:"center",fontWeight:800,fontSize:10,color,letterSpacing:"0.04em",textTransform:"uppercase",whiteSpace:"nowrap",background:"#0a0f1e",borderBottom:"2px solid rgba(255,255,255,0.08)"});
-          const tdCls = (color, bold) => ({padding:"6px 8px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:bold?700:600,color,fontSize:11.5,whiteSpace:"nowrap"});
+          const thCls = (color) => ({padding:"6px 8px",textAlign:"center",fontWeight:800,fontSize:10,color,letterSpacing:"0.04em",textTransform:"uppercase",whiteSpace:"nowrap",background:"#0a0f1e",borderBottom:"2px solid rgba(255,255,255,0.08)"});
+          const tdCls = (color, bold, eliminated) => ({padding:"4px 8px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:bold?700:600,color:eliminated?"rgba(150,60,60,0.8)":color,fontSize:11,whiteSpace:"nowrap"});
 
           const MatrixTable = ({ids, offset}) => (
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead style={{position:"sticky",top:0,zIndex:20}}>
                 <tr>
-                  <th style={{...thCls("rgba(255,255,255,0.5)"),textAlign:"left",padding:"7px 10px",minWidth:130}}>Takım</th>
+                  <th style={{...thCls("rgba(255,255,255,0.5)"),textAlign:"left",padding:"6px 10px",minWidth:130}}>Takım</th>
                   <th style={thCls("#10b981")}>S32</th>
                   <th style={thCls("rgba(255,255,255,0.6)")}>S16</th>
                   <th style={thCls("rgba(255,255,255,0.7)")}>ÇF</th>
@@ -1290,29 +1299,34 @@ export default function App() {
                   const champPct = t.champion ?? 0;
                   const rowIdx = offset + i;
                   const isTop3 = rowIdx < 3;
+                  const isEliminated = champPct === 0 && (t.r32 ?? 0) === 0;
+                  const baseRowBg = isEliminated
+                    ? (i%2===0 ? "rgba(239,68,68,0.07)" : "rgba(239,68,68,0.11)")
+                    : (i%2===0 ? "#ffffff" : "#fafbfc");
+                  const hoverBg = isEliminated ? "rgba(239,68,68,0.15)" : "rgba(16,185,129,0.04)";
                   return (
                     <tr key={id}
-                      style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"#ffffff":"#fafbfc",transition:"background 0.12s"}}
-                      onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,0.04)"}
-                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#ffffff":"#fafbfc"}>
-                      <td style={{padding:"6px 10px"}}>
+                      style={{borderBottom:"1px solid #f1f5f9",background:baseRowBg,transition:"background 0.12s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background=hoverBg}
+                      onMouseLeave={e=>e.currentTarget.style.background=baseRowBg}>
+                      <td style={{padding:"4px 10px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:7}}>
-                          <span style={{fontSize:10,fontFamily:"monospace",color:"#94a3b8",fontWeight:700,minWidth:18,textAlign:"right"}}>{rowIdx+1}</span>
-                          <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",boxShadow:"0 1px 2px rgba(0,0,0,0.1)",flexShrink:0}} alt="" />
-                          <span style={{fontWeight:700,color:"#0f172a",fontSize:12,whiteSpace:"nowrap"}}>{INITIAL_TEAMS[id]?.name}</span>
+                          <span style={{fontSize:10,fontFamily:"monospace",color:isEliminated?"rgba(180,80,80,0.6)":"#94a3b8",fontWeight:700,minWidth:18,textAlign:"right"}}>{rowIdx+1}</span>
+                          <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",boxShadow:"0 1px 2px rgba(0,0,0,0.1)",flexShrink:0,opacity:isEliminated?0.45:1}} alt="" />
+                          <span style={{fontWeight:700,color:isEliminated?"rgba(150,60,60,0.7)":"#0f172a",fontSize:12,whiteSpace:"nowrap"}}>{INITIAL_TEAMS[id]?.name}</span>
                         </div>
                       </td>
-                      <td style={tdCls("#059669",true)}>{(t.r32??0).toFixed(1)}%</td>
-                      <td style={tdCls("#374151",false)}>{(t.r16??0).toFixed(1)}%</td>
-                      <td style={tdCls("#374151",false)}>{(t.qf??0).toFixed(1)}%</td>
-                      <td style={tdCls("#0284c7",true)}>{(t.sf??0).toFixed(1)}%</td>
-                      <td style={tdCls("#7c3aed",true)}>{(t.f??0).toFixed(1)}%</td>
-                      <td style={{padding:"6px 8px",background:"rgba(217,119,6,0.02)"}}>
+                      <td style={tdCls("#059669",true,isEliminated)}>{(t.r32??0).toFixed(1)}%</td>
+                      <td style={tdCls("#374151",false,isEliminated)}>{(t.r16??0).toFixed(1)}%</td>
+                      <td style={tdCls("#374151",false,isEliminated)}>{(t.qf??0).toFixed(1)}%</td>
+                      <td style={tdCls("#0284c7",true,isEliminated)}>{(t.sf??0).toFixed(1)}%</td>
+                      <td style={tdCls("#7c3aed",true,isEliminated)}>{(t.f??0).toFixed(1)}%</td>
+                      <td style={{padding:"4px 8px",background:isEliminated?"rgba(239,68,68,0.04)":"rgba(217,119,6,0.02)"}}>
                         <div style={{display:"flex",alignItems:"center",gap:5}}>
-                          <div style={{width:36,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
-                            <div style={{width:`${Math.min(100,(champPct/maxChamp)*100)}%`,height:"100%",background:isTop3?"linear-gradient(90deg,#d97706,#f59e0b)":"linear-gradient(90deg,#94a3b8,#cbd5e1)",borderRadius:2}}></div>
+                          <div style={{width:32,height:3,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                            <div style={{width:`${Math.min(100,(champPct/maxChamp)*100)}%`,height:"100%",background:isEliminated?"rgba(200,80,80,0.3)":isTop3?"linear-gradient(90deg,#d97706,#f59e0b)":"linear-gradient(90deg,#94a3b8,#cbd5e1)",borderRadius:2}}></div>
                           </div>
-                          <span style={{fontFamily:"monospace",fontWeight:900,color:isTop3?"#b45309":"#374151",fontSize:12,minWidth:38,textAlign:"right"}}>{champPct.toFixed(1)}%</span>
+                          <span style={{fontFamily:"monospace",fontWeight:900,color:isEliminated?"rgba(150,60,60,0.6)":isTop3?"#b45309":"#374151",fontSize:11.5,minWidth:38,textAlign:"right"}}>{champPct.toFixed(1)}%</span>
                         </div>
                       </td>
                     </tr>
@@ -1337,6 +1351,10 @@ export default function App() {
                       <span style={{color:"rgba(255,255,255,0.7)",fontWeight:700}}>{k}</span> = {v}
                     </div>
                   ))}
+                  <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"monospace",display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{width:8,height:8,borderRadius:2,background:"rgba(239,68,68,0.35)",display:"inline-block"}}></span>
+                    Elenmiş
+                  </div>
                 </div>
               </div>
               {/* Dual column tables */}
