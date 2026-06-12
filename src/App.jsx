@@ -840,6 +840,8 @@ export default function App() {
 
   const renderGroups = () => {
     if (!liveTableData.groups || Object.keys(liveTableData.groups).length === 0) return null;
+    // Qualified thirds: top 8 from liveTableData.thirds
+    const qualifiedThirdIds = new Set((liveTableData.thirds || []).slice(0, 8).map(t => t.id));
     return Object.keys(GROUPS_CONFIG).map(gName => {
       const sorted = liveTableData.groups[gName] || [];
       return (
@@ -851,12 +853,36 @@ export default function App() {
           <div>
             {sorted.map((item, index) => {
               const id = item.id;
+              const isTop2 = index < 2;
+              const isQThird = index === 2 && qualifiedThirdIds.has(id);
+              let rowBg = "transparent";
+              let rowBorder = "none";
+              let nameColor = "var(--text-primary)";
+              let statColor = "#475569";
+              if (isTop2) {
+                rowBg = "rgba(16,185,129,0.10)";
+                rowBorder = "1px solid rgba(16,185,129,0.25)";
+                nameColor = "#047857";
+                statColor = "#047857";
+              } else if (isQThird) {
+                rowBg = "rgba(249,115,22,0.10)";
+                rowBorder = "1px solid rgba(249,115,22,0.28)";
+                nameColor = "#c2410c";
+                statColor = "#c2410c";
+              }
               return (
-                <div key={id} className="group-team-row">
-                  <span className="rank">{index + 1}</span>
+                <div key={id} className="group-team-row" style={{
+                  background: rowBg,
+                  border: rowBorder,
+                  borderRadius: (isTop2 || isQThird) ? 6 : 0,
+                  marginBottom: (isTop2 || isQThird) ? 2 : 0,
+                  paddingLeft: (isTop2 || isQThird) ? 4 : 0,
+                  paddingRight: (isTop2 || isQThird) ? 4 : 0,
+                }}>
+                  <span className="rank" style={{color: isTop2 ? "#047857" : isQThird ? "#c2410c" : "#94a3b8"}}>{index + 1}</span>
                   <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:15,height:10,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 4px"}} alt="" />
-                  <span className="team-name" style={{fontSize:11.5, color:"var(--text-primary)"}}>{INITIAL_TEAMS[id]?.name}</span>
-                  <span style={{fontFamily:"monospace",fontWeight:700,fontSize:10.5,color:"#475569",flexShrink:0}}>
+                  <span className="team-name" style={{fontSize:12.5, color: nameColor, fontWeight: (isTop2 || isQThird) ? 700 : 600}}>{INITIAL_TEAMS[id]?.name}</span>
+                  <span style={{fontFamily:"monospace",fontWeight:700,fontSize:11.5,color: statColor,flexShrink:0}}>
                     {item.gd >= 0 ? `+${item.gd}` : item.gd} | {item.pts}
                   </span>
                 </div>
@@ -907,7 +933,7 @@ export default function App() {
         </nav>
       </header>
 
-      <main style={{flex:1,padding:"16px 20px",maxWidth:"100%",width:"100%"}}>
+      <main style={{flex:1,padding:"16px 16px 32px",maxWidth:"100%",width:"100%"}}>
 
         {/* === BRACKET TAB === */}
         {activeTab==="bracket" && bracket && (
@@ -919,10 +945,16 @@ export default function App() {
                 <div className="groups-panel-grid">{renderGroups()}</div>
               </div>
               {/* Thirds Panel - right side, same height */}
-              <div style={{width:220,flexShrink:0,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
-                <div style={{fontSize:10,fontWeight:900,color:"#0f172a",marginBottom:10,display:"flex",alignItems:"center",gap:7,letterSpacing:"0.07em",textTransform:"uppercase",fontFamily:"'Inter',system-ui,sans-serif",paddingBottom:8,borderBottom:"2px solid #f0fdf4"}}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                  <span style={{color:"#047857"}}>EN İYİ 3.LER</span>
+              <div style={{width:270,flexShrink:0,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
+                <div style={{fontSize:10,fontWeight:900,color:"#0f172a",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between",letterSpacing:"0.07em",textTransform:"uppercase",fontFamily:"'Inter',system-ui,sans-serif",paddingBottom:8,borderBottom:"2px solid #f0fdf4"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7}}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <span style={{color:"#047857"}}>EN İYİ 3.LER</span>
+                  </div>
+                  <div style={{display:"flex",gap:14,alignItems:"center",paddingRight:2}}>
+                    <span style={{fontSize:9,fontFamily:"monospace",fontWeight:800,color:"#94a3b8",letterSpacing:"0.06em"}}>P</span>
+                    <span style={{fontSize:9,fontFamily:"monospace",fontWeight:800,color:"#94a3b8",letterSpacing:"0.06em"}}>AV</span>
+                  </div>
                 </div>
                 <div className="thirds-grid" style={{flex:1}}>
                   {bracket.sortedThirds.map((id, index) => {
@@ -937,10 +969,10 @@ export default function App() {
                           {INITIAL_TEAMS[id]?.name}
                           <span style={{fontSize:9,color:isQ?"#10b981":"#cbd5e1",marginLeft:3,fontFamily:"monospace",fontWeight:600}}>({gLetter})</span>
                         </span>
-                        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
-                          <span style={{fontSize:10.5,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",background:isQ?"rgba(16,185,129,0.1)":"#f1f5f9",padding:"1px 5px",borderRadius:4}}>{tData.pts}P</span>
-                          <span style={{fontSize:10,fontWeight:700,color:tData.gd>=0?"#1d4ed8":"#dc2626",fontFamily:"monospace",minWidth:32,textAlign:"right"}}>
-                            {tData.gd >= 0 ? `+${tData.gd}` : tData.gd}AV
+                        <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                          <span style={{fontSize:11,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",background:isQ?"rgba(16,185,129,0.1)":"#f1f5f9",padding:"1px 6px",borderRadius:4,minWidth:22,textAlign:"center"}}>{tData.pts}</span>
+                          <span style={{fontSize:10.5,fontWeight:700,color:tData.gd>=0?"#1d4ed8":"#dc2626",fontFamily:"monospace",minWidth:28,textAlign:"right"}}>
+                            {tData.gd >= 0 ? `+${tData.gd}` : tData.gd}
                           </span>
                         </div>
                       </div>
@@ -957,7 +989,7 @@ export default function App() {
                   item === null ? (
                     <div key={i} style={{width:"230px",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                      <span style={{fontSize:9.5,fontWeight:900,color:"#f59e0b",letterSpacing:"0.1em",textTransform:"uppercase"}}>PODYUM MERKEZİ</span>
+                      <span style={{fontSize:9.5,fontWeight:900,color:"#f59e0b",letterSpacing:"0.1em",textTransform:"uppercase"}}>FİNAL</span>
                     </div>
                   ) : (
                     <div key={i} style={{flex:"1 1 0%",maxWidth:"135px",fontSize:9,fontWeight:700,color:item[1],letterSpacing:"0.1em",textTransform:"uppercase",textAlign:"center"}}>
