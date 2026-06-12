@@ -18,7 +18,7 @@ const INITIAL_TEAMS = {
   BRA: { name: "Brezilya", iso: "br", elo: 1991 },
   MAR: { name: "Fas", iso: "ma", elo: 1827 },
   HAI: { name: "Haiti", iso: "ht", elo: 1548 },
-  SCO: { name: "İskoçya", iso: "gb", elo: 1782 },
+  SCO: { name: "İskoçya", iso: "gb-sct", elo: 1782 },
 
   USA: { name: "ABD", iso: "us", elo: 1726 },
   PAR: { name: "Paraguay", iso: "py", elo: 1834 },
@@ -60,7 +60,7 @@ const INITIAL_TEAMS = {
   UZB: { name: "Özbekistan", iso: "uz", elo: 1714 },
   COL: { name: "Kolombiya", iso: "co", elo: 1982 },
 
-  ENG: { name: "İngiltere", iso: "gb", elo: 2024 },
+  ENG: { name: "İngiltere", iso: "gb-eng", elo: 2024 },
   CRO: { name: "Hırvatistan", iso: "hr", elo: 1912 },
   GHA: { name: "Gana", iso: "gh", elo: 1510 },
   PAN: { name: "Panama", iso: "pa", elo: 1730 }
@@ -840,50 +840,67 @@ export default function App() {
 
   const renderGroups = () => {
     if (!liveTableData.groups || Object.keys(liveTableData.groups).length === 0) return null;
-    // Qualified thirds: top 8 from liveTableData.thirds
     const qualifiedThirdIds = new Set((liveTableData.thirds || []).slice(0, 8).map(t => t.id));
     return Object.keys(GROUPS_CONFIG).map(gName => {
       const sorted = liveTableData.groups[gName] || [];
       return (
         <div key={gName} className="group-card">
-          <div className="group-header">
-            <span>GRUP {gName}</span>
-            <span style={{fontSize:9,color:"#64748b",fontFamily:"monospace"}}>AV / P</span>
+          {/* Grup başlık + kolon etiketleri */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
+            <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>GRUP {gName}</span>
+            <div style={{display:"flex",gap:0,alignItems:"center"}}>
+              <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
+              <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
+            </div>
           </div>
-          <div>
+          {/* Satırlar */}
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
             {sorted.map((item, index) => {
               const id = item.id;
               const isTop2 = index < 2;
               const isQThird = index === 2 && qualifiedThirdIds.has(id);
               let rowBg = "transparent";
-              let rowBorder = "none";
-              let nameColor = "var(--text-primary)";
-              let statColor = "#475569";
+              let leftAccent = "transparent";
+              let nameColor = "#374151";
+              let fontWeight = 500;
               if (isTop2) {
-                rowBg = "rgba(16,185,129,0.10)";
-                rowBorder = "1px solid rgba(16,185,129,0.25)";
-                nameColor = "#047857";
-                statColor = "#047857";
+                rowBg = "rgba(16,185,129,0.09)";
+                leftAccent = "#10b981";
+                nameColor = "#065f46";
+                fontWeight = 700;
               } else if (isQThird) {
-                rowBg = "rgba(249,115,22,0.10)";
-                rowBorder = "1px solid rgba(249,115,22,0.28)";
-                nameColor = "#c2410c";
-                statColor = "#c2410c";
+                rowBg = "rgba(249,115,22,0.09)";
+                leftAccent = "#f97316";
+                nameColor = "#9a3412";
+                fontWeight = 700;
               }
+              const gdColor = item.gd > 0 ? "#1d4ed8" : item.gd < 0 ? "#dc2626" : "#94a3b8";
               return (
-                <div key={id} className="group-team-row" style={{
+                <div key={id} style={{
+                  display:"flex",
+                  alignItems:"center",
                   background: rowBg,
-                  border: rowBorder,
-                  borderRadius: (isTop2 || isQThird) ? 6 : 0,
-                  marginBottom: (isTop2 || isQThird) ? 2 : 0,
-                  paddingLeft: (isTop2 || isQThird) ? 4 : 0,
-                  paddingRight: (isTop2 || isQThird) ? 4 : 0,
+                  borderRadius: 6,
+                  borderLeft: `3px solid ${leftAccent}`,
+                  paddingLeft: 5,
+                  paddingRight: 4,
+                  paddingTop: 3,
+                  paddingBottom: 3,
+                  minHeight: 26,
                 }}>
-                  <span className="rank" style={{color: isTop2 ? "#047857" : isQThird ? "#c2410c" : "#94a3b8"}}>{index + 1}</span>
-                  <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:15,height:10,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 4px"}} alt="" />
-                  <span className="team-name" style={{fontSize:12.5, color: nameColor, fontWeight: (isTop2 || isQThird) ? 700 : 600}}>{INITIAL_TEAMS[id]?.name}</span>
-                  <span style={{fontFamily:"monospace",fontWeight:700,fontSize:11.5,color: statColor,flexShrink:0}}>
-                    {item.gd >= 0 ? `+${item.gd}` : item.gd} | {item.pts}
+                  {/* Sıra */}
+                  <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isTop2?"#059669": isQThird?"#ea580c":"#cbd5e1",width:12,flexShrink:0,textAlign:"center"}}>{index+1}</span>
+                  {/* Bayrak */}
+                  <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
+                  {/* İsim */}
+                  <span style={{flex:1,fontSize:12,fontWeight,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>{INITIAL_TEAMS[id]?.name}</span>
+                  {/* AV */}
+                  <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColor,flexShrink:0}}>
+                    {item.gd > 0 ? `+${item.gd}` : item.gd}
+                  </span>
+                  {/* P */}
+                  <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:800,color: isTop2?"#047857": isQThird?"#ea580c":"#0f172a",flexShrink:0}}>
+                    {item.pts}
                   </span>
                 </div>
               );
