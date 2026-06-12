@@ -197,32 +197,34 @@ function MatchCard({ m, score }) {
   const isWinnerA = actualWinner === m?.idA;
   const isWinnerB = actualWinner === m?.idB;
 
+  const flagStyle = { width:15, height:11, borderRadius:2, objectFit:"cover", flexShrink:0, display:"block" };
+
   return (
     <div className="match-card" style={{ position:"relative" }}>
       <div className={`match-row ${isWinnerA ? "winner" : "loser"}`}>
         <div style={{ display:"flex", alignItems:"center", gap:4, flex:1, minWidth:0 }}>
-          <img src={getFlagUrl(flagA)} style={{ width:14, height:10, borderRadius:2, objectFit:"cover", flexShrink:0 }} alt="" />
+          <img src={getFlagUrl(flagA)} style={flagStyle} alt="" />
           <span className="team-name">{nameA}</span>
         </div>
         {hasScore ? (
-          <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerA ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center" }}>
+          <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerA ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center", flexShrink:0 }}>
             {score.home}
           </span>
         ) : (
-          <span className="pct-badge" style={{ color: isWinnerA ? "#047857" : "#64748b" }}>{m?.pA ?? 50}%</span>
+          <span className="pct-badge" style={{ color: isWinnerA ? "#047857" : "#64748b", flexShrink:0 }}>{m?.pA ?? 50}%</span>
         )}
       </div>
       <div className={`match-row ${isWinnerB ? "winner" : "loser"}`}>
         <div style={{ display:"flex", alignItems:"center", gap:4, flex:1, minWidth:0 }}>
-          <img src={getFlagUrl(flagB)} style={{ width:14, height:10, borderRadius:2, objectFit:"cover", flexShrink:0 }} alt="" />
+          <img src={getFlagUrl(flagB)} style={flagStyle} alt="" />
           <span className="team-name">{nameB}</span>
         </div>
         {hasScore ? (
-          <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerB ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center" }}>
+          <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerB ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center", flexShrink:0 }}>
             {score.away}
           </span>
         ) : (
-          <span className="pct-badge" style={{ color: isWinnerB ? "#047857" : "#64748b" }}>{m?.pB ?? 50}%</span>
+          <span className="pct-badge" style={{ color: isWinnerB ? "#047857" : "#64748b", flexShrink:0 }}>{m?.pB ?? 50}%</span>
         )}
       </div>
       {hasScore && (
@@ -347,69 +349,125 @@ function BracketView({ bracket, knockoutScores }) {
           {(() => { const sc = getOrientedScore(bracket.left_sf, getScore(bracket.left_sf)); return <MatchCard m={bracket.left_sf} score={sc} />; })()}
         </div>
 
-        {/* CENTER PODIUM */}
-        <div className="podium-center" style={{ alignSelf:"center", width: "230px", flexShrink: 0 }}>
-          <div style={{ marginBottom:8 }}>
-            <div style={{ fontSize:9, fontWeight:900, color:"#475569", textTransform:"uppercase", letterSpacing:"0.08em", fontFamily:"monospace", marginBottom:4 }}>FİNALİST A</div>
-            <div className="finalist-box">
-              <img src={getFlagUrl(INITIAL_TEAMS[bracket.finalMatch.idA]?.iso)} style={{ width:16,height:11,borderRadius:2,objectFit:"cover" }} alt="" />
-              <span style={{ fontSize:11,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{INITIAL_TEAMS[bracket.finalMatch.idA]?.name||"---"}</span>
-            </div>
-          </div>
-          <div className="champion-box" style={{ margin:"8px 0" }}>
-            <img src={LOGO_URL} style={{ width: 44, height: 44, margin: "0 auto 6px", objectFit: "contain" }} alt="Kupa" />
-            <div style={{ fontSize:9, fontWeight:900, color:"#b45309", textTransform:"uppercase", letterSpacing:"0.1em", fontFamily:"monospace",display:"flex",alignItems:"center",justifyContent:"center",gap:5 }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="#d97706" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              WORLD CHAMPION
-            </div>
-            <div style={{ marginTop:6, background:"#ffffff", borderRadius:8, padding:"6px 10px", display:"flex", alignItems:"center", justifyContent:"center", gap:6, border:"1px solid #d97706", boxShadow:"0 2px 4px rgba(0,0,0,0.05)" }}>
-              <img src={getFlagUrl(INITIAL_TEAMS[bracket.finalMatch.winner]?.iso)} style={{ width:18,height:12,borderRadius:2,objectFit:"cover" }} alt="" />
-              <span style={{ fontSize:12.5,fontWeight:900,color:"#b45309" }}>{INITIAL_TEAMS[bracket.finalMatch.winner]?.name||"---"}</span>
+        {/* CENTER PODIUM — yeniden tasarım */}
+        <div style={{
+          alignSelf:"center", width:"240px", flexShrink:0,
+          display:"flex", flexDirection:"column", gap:6,
+          fontFamily:"var(--font-sans)"
+        }}>
+
+          {/* ── FİNAL BLOĞU ── */}
+          <div style={{
+            background:"linear-gradient(160deg,#0a0f1e 0%,#0f2027 100%)",
+            borderRadius:16, overflow:"hidden",
+            boxShadow:"0 8px 32px rgba(10,15,30,0.22), 0 2px 8px rgba(0,0,0,0.12)",
+            border:"1px solid rgba(245,158,11,0.25)"
+          }}>
+            {/* başlık şeridi */}
+            <div style={{
+              background:"linear-gradient(90deg,#d97706,#f59e0b)",
+              padding:"5px 12px",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:6
+            }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <span style={{fontSize:9.5,fontWeight:900,color:"#fff",letterSpacing:"0.18em",textTransform:"uppercase"}}>FİNAL</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             </div>
 
-            <div style={{ marginTop:12, borderTop:"1px solid #e2e8f0", paddingTop:8 }}>
-              <div style={{ fontSize:9, fontWeight:900, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4, fontFamily:"monospace",display:"flex",alignItems:"center",gap:4 }}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              KAZANMA OLASILIKLARI
-            </div>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", fontSize:10.5, fontFamily:"monospace", fontWeight:700, marginBottom:3 }}>
-                <span style={{ color:"#047857" }}>{bracket.finalMatch.pA}%</span>
-                <span style={{ color:"#1d4ed8" }}>{bracket.finalMatch.pB}%</span>
-              </div>
-              <div style={{ width:"100%", height:7, background:"#e2e8f0", borderRadius:4, overflow:"hidden", display:"flex" }}>
-                <div style={{ width: `${bracket.finalMatch.pA}%`, height:"100%", background:"#10b981" }}></div>
-                <div style={{ width: `${bracket.finalMatch.pB}%`, height:"100%", background:"#3b82f6" }}></div>
-              </div>
-            </div>
-          </div>
-          <div style={{ marginBottom:8 }}>
-            <div style={{ fontSize:9, fontWeight:900, color:"#475569", textTransform:"uppercase", letterSpacing:"0.08em", fontFamily:"monospace", marginBottom:4 }}>FİNALİST B</div>
-            <div className="finalist-box">
-              <img src={getFlagUrl(INITIAL_TEAMS[bracket.finalMatch.idB]?.iso)} style={{ width:16,height:11,borderRadius:2,objectFit:"cover" }} alt="" />
-              <span style={{ fontSize:11,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{INITIAL_TEAMS[bracket.finalMatch.idB]?.name||"---"}</span>
-            </div>
-          </div>
-          <div style={{ borderTop:"1px solid #e2e8f0", paddingTop:8 }}>
-            <div style={{ fontSize:9, fontWeight:900, color:"#0891b2", textTransform:"uppercase", letterSpacing:"0.08em", fontFamily:"monospace", textAlign:"center", marginBottom:5,display:"flex",alignItems:"center",justifyContent:"center",gap:4 }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="#cd7f32" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              ÜÇÜNCÜLÜK MAÇI
-            </div>
-            <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"6px 8px" }}>
-              {[{id:bracket.thirdPlaceMatch.idA, p:bracket.thirdPlaceMatch.pA},{id:bracket.thirdPlaceMatch.idB, p:bracket.thirdPlaceMatch.pB}].map((t,i) => (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:11, color:"var(--text-primary)", ...(i>0?{borderTop:"1px solid #edf2f7",paddingTop:4,marginTop:4}:{}) }}>
-                  <span style={{ display:"flex", alignItems:"center", gap:4 }}>
-                    <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{ width:13,height:9,borderRadius:2 }} alt="" />
-                    {INITIAL_TEAMS[t.id]?.name}
-                  </span>
-                  <span style={{ color:"#0891b2", fontWeight:700, fontFamily:"monospace" }}>{t.p}%</span>
+            <div style={{padding:"10px 12px 12px"}}>
+              {/* Finalistler */}
+              {[
+                {id: bracket.finalMatch.idA, p: bracket.finalMatch.pA, isWinner: bracket.finalMatch.winner === bracket.finalMatch.idA},
+                {id: bracket.finalMatch.idB, p: bracket.finalMatch.pB, isWinner: bracket.finalMatch.winner === bracket.finalMatch.idB},
+              ].map((t, i) => (
+                <div key={i}>
+                  <div style={{
+                    display:"flex", alignItems:"center", gap:7,
+                    padding:"6px 8px", borderRadius:8,
+                    background: t.isWinner ? "rgba(245,158,11,0.13)" : "rgba(255,255,255,0.05)",
+                    border: t.isWinner ? "1px solid rgba(245,158,11,0.35)" : "1px solid rgba(255,255,255,0.06)",
+                    marginBottom: i === 0 ? 4 : 0,
+                  }}>
+                    <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{width:20,height:14,borderRadius:3,objectFit:"cover",flexShrink:0,boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}} alt="" />
+                    <span style={{flex:1,fontSize:11.5,fontWeight: t.isWinner?800:600,color: t.isWinner?"#fbbf24":"rgba(255,255,255,0.7)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {INITIAL_TEAMS[t.id]?.name||"---"}
+                    </span>
+                    {t.isWinner && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    )}
+                    <span style={{fontSize:10,fontFamily:"var(--font-mono)",fontWeight:800,color: t.isWinner?"#fbbf24":"rgba(255,255,255,0.4)",flexShrink:0}}>
+                      {t.p}%
+                    </span>
+                  </div>
+                  {i === 0 && (
+                    <div style={{
+                      width:"100%", height:5, background:"rgba(255,255,255,0.06)",
+                      borderRadius:3, overflow:"hidden", display:"flex", margin:"6px 0"
+                    }}>
+                      <div style={{width:`${bracket.finalMatch.pA}%`,height:"100%",background:"linear-gradient(90deg,#10b981,#34d399)"}}/>
+                      <div style={{width:`${bracket.finalMatch.pB}%`,height:"100%",background:"linear-gradient(90deg,#3b82f6,#60a5fa)"}}/>
+                    </div>
+                  )}
                 </div>
               ))}
-              <div style={{ marginTop:6, background:"rgba(6,182,212,0.08)", border:"1px solid rgba(6,182,212,0.2)", borderRadius:6, padding:"4px 6px", textAlign:"center", fontSize:11, fontWeight:800, color:"#0891b2",display:"flex",alignItems:"center",justifyContent:"center",gap:5 }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="#cd7f32" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                {INITIAL_TEAMS[bracket.thirdPlaceMatch.winner]?.name}
+
+              {/* ŞAMPİYON kutu */}
+              <div style={{
+                marginTop:8,
+                background:"linear-gradient(135deg,rgba(217,119,6,0.18),rgba(251,191,36,0.10))",
+                border:"1px solid rgba(245,158,11,0.4)",
+                borderRadius:10, padding:"8px 10px",
+                display:"flex", flexDirection:"column", alignItems:"center", gap:4
+              }}>
+                <span style={{fontSize:8.5,fontWeight:900,color:"rgba(251,191,36,0.7)",letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:"var(--font-mono)"}}>DÜNYA ŞAMPİYONU</span>
+                <div style={{display:"flex",alignItems:"center",gap:7}}>
+                  <img src={LOGO_URL} style={{width:22,height:22,objectFit:"contain",opacity:0.9}} alt="" />
+                  <img src={getFlagUrl(INITIAL_TEAMS[bracket.finalMatch.winner]?.iso)} style={{width:24,height:17,borderRadius:3,objectFit:"cover",boxShadow:"0 2px 6px rgba(0,0,0,0.35)"}} alt="" />
+                  <span style={{fontSize:13,fontWeight:900,color:"#fbbf24",fontFamily:"var(--font-sans)",letterSpacing:"0.01em"}}>
+                    {INITIAL_TEAMS[bracket.finalMatch.winner]?.name||"---"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* ── ÜÇÜNCÜLÜK MAÇI BLOĞU ── */}
+          <div style={{
+            background:"#ffffff",
+            border:"1px solid #e2e8f0",
+            borderRadius:12, overflow:"hidden",
+            boxShadow:"0 2px 10px rgba(0,0,0,0.06)"
+          }}>
+            <div style={{
+              background:"linear-gradient(90deg,#7c3aed,#a855f7)",
+              padding:"4px 10px",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:5
+            }}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <span style={{fontSize:8.5,fontWeight:900,color:"#fff",letterSpacing:"0.16em",textTransform:"uppercase"}}>ÜÇÜNCÜLÜK MAÇI</span>
+            </div>
+            <div style={{padding:"8px 10px"}}>
+              {[
+                {id:bracket.thirdPlaceMatch.idA, p:bracket.thirdPlaceMatch.pA, isWinner: bracket.thirdPlaceMatch.winner===bracket.thirdPlaceMatch.idA},
+                {id:bracket.thirdPlaceMatch.idB, p:bracket.thirdPlaceMatch.pB, isWinner: bracket.thirdPlaceMatch.winner===bracket.thirdPlaceMatch.idB},
+              ].map((t,i) => (
+                <div key={i} style={{
+                  display:"flex", alignItems:"center", gap:6,
+                  padding:"5px 6px", borderRadius:7,
+                  background: t.isWinner ? "rgba(124,58,237,0.07)" : "transparent",
+                  marginBottom: i===0 ? 3 : 0,
+                }}>
+                  <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}} alt="" />
+                  <span style={{flex:1,fontSize:11,fontWeight: t.isWinner?700:500,color: t.isWinner?"#5b21b6":"#374151",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {INITIAL_TEAMS[t.id]?.name||"---"}
+                  </span>
+                  {t.isWinner && <svg width="10" height="10" viewBox="0 0 24 24" fill="#7c3aed"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>}
+                  <span style={{fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,color: t.isWinner?"#7c3aed":"#94a3b8",flexShrink:0}}>{t.p}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
 
         <div ref={rSFRef} style={{ ...colStyle("center"), justifyContent:"center" }}>
@@ -899,7 +957,7 @@ export default function App() {
                     {item.gd > 0 ? `+${item.gd}` : item.gd}
                   </span>
                   {/* P */}
-                  <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:800,color: isTop2?"#047857": isQThird?"#ea580c":"#0f172a",flexShrink:0}}>
+                  <span style={{width:24,textAlign:"center",fontSize:12,fontFamily:"var(--font-mono)",fontWeight:900,color: isTop2?"#047857": isQThird?"#ea580c":"#0f172a",flexShrink:0}}>
                     {item.pts}
                   </span>
                 </div>
@@ -962,36 +1020,52 @@ export default function App() {
                 <div className="groups-panel-grid">{renderGroups()}</div>
               </div>
               {/* Thirds Panel - right side, same height */}
-              <div style={{width:270,flexShrink:0,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"12px 14px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
-                <div style={{fontSize:10,fontWeight:900,color:"#0f172a",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between",letterSpacing:"0.07em",textTransform:"uppercase",fontFamily:"'Inter',system-ui,sans-serif",paddingBottom:8,borderBottom:"2px solid #f0fdf4"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7}}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    <span style={{color:"#047857"}}>EN İYİ 3.LER</span>
+              <div style={{width:270,flexShrink:0,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
+                {/* Başlık + kolon etiketleri — grup kartlarıyla aynı stil */}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>EN İYİ 3.LER</span>
                   </div>
-                  <div style={{display:"flex",gap:14,alignItems:"center",paddingRight:2}}>
-                    <span style={{fontSize:9,fontFamily:"monospace",fontWeight:800,color:"#94a3b8",letterSpacing:"0.06em"}}>P</span>
-                    <span style={{fontSize:9,fontFamily:"monospace",fontWeight:800,color:"#94a3b8",letterSpacing:"0.06em"}}>AV</span>
+                  <div style={{display:"flex",gap:0,alignItems:"center"}}>
+                    <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
+                    <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
                   </div>
                 </div>
-                <div className="thirds-grid" style={{flex:1}}>
+                <div style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
                   {bracket.sortedThirds.map((id, index) => {
                     const isQ = bracket.qualifiedThirds.includes(id);
                     const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
                     const tData = liveTableData.thirds.find(x => x.id === id) || { pts: 0, gd: 0 };
+                    const leftAccent = isQ ? "#f97316" : "transparent";
+                    const rowBg = isQ ? "rgba(249,115,22,0.09)" : "transparent";
+                    const nameColor = isQ ? "#9a3412" : "#94a3b8";
+                    const gdColor = tData.gd > 0 ? "#1d4ed8" : tData.gd < 0 ? "#dc2626" : "#94a3b8";
                     return (
-                      <div key={id} className={`third-chip ${isQ ? "qualified" : "eliminated"}`}>
-                        <span style={{fontSize:9,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",flexShrink:0,minWidth:16}}>{index+1}.</span>
-                        <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
-                        <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12,fontWeight:700,color:isQ?"#0f172a":"#94a3b8"}}>
+                      <div key={id} style={{
+                        display:"flex", alignItems:"center",
+                        background: rowBg,
+                        borderRadius: 6,
+                        borderLeft: `3px solid ${leftAccent}`,
+                        paddingLeft: 5, paddingRight: 4,
+                        paddingTop: 3, paddingBottom: 3,
+                        minHeight: 26,
+                        opacity: isQ ? 1 : 0.5,
+                      }}>
+                        <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?"#ea580c":"#cbd5e1",width:16,flexShrink:0,textAlign:"center"}}>{index+1}</span>
+                        <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
+                        <span style={{flex:1,fontSize:11.5,fontWeight: isQ?700:500,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>
                           {INITIAL_TEAMS[id]?.name}
-                          <span style={{fontSize:9,color:isQ?"#10b981":"#cbd5e1",marginLeft:3,fontFamily:"monospace",fontWeight:600}}>({gLetter})</span>
+                          <span style={{fontSize:9,color: isQ?"#f97316":"#e2e8f0",marginLeft:3,fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
                         </span>
-                        <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
-                          <span style={{fontSize:11,fontWeight:800,color:isQ?"#047857":"#94a3b8",fontFamily:"monospace",background:isQ?"rgba(16,185,129,0.1)":"#f1f5f9",padding:"1px 6px",borderRadius:4,minWidth:22,textAlign:"center"}}>{tData.pts}</span>
-                          <span style={{fontSize:10.5,fontWeight:700,color:tData.gd>=0?"#1d4ed8":"#dc2626",fontFamily:"monospace",minWidth:28,textAlign:"right"}}>
-                            {tData.gd >= 0 ? `+${tData.gd}` : tData.gd}
-                          </span>
-                        </div>
+                        {/* AV */}
+                        <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?gdColor:"#cbd5e1",flexShrink:0}}>
+                          {tData.gd > 0 ? `+${tData.gd}` : tData.gd}
+                        </span>
+                        {/* P */}
+                        <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:900,color: isQ?"#ea580c":"#cbd5e1",flexShrink:0}}>
+                          {tData.pts}
+                        </span>
                       </div>
                     );
                   })}
