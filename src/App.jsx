@@ -1356,7 +1356,7 @@ export default function App() {
     // pos1/2/3: seçili takım (me) grubu 1./2./3. bitirdiği simlerde toplam karşılaşma
     const encounterStats = {};
     const firstSimDisplayScores = {};
-
+    const firstSimBracketPath = {}; // sim=0'daki eleme turu sonuçları
     Object.keys(teams).forEach(id => {
       stats[id] = { id, r32:0,r16:0,qf:0,sf:0,f:0,champion:0,thirdPlaceChamp:0,g1:0,g2:0,g3:0,g4:0 };
       encounterStats[id] = {};
@@ -1469,8 +1469,11 @@ export default function App() {
           matchupStats[pk].total++;
           addEncounter(idA, idB, roundKey, groupPos[idA], groupPos[idB]);
           const pA=getWinProbability(teams[idA].elo,teams[idB].elo);
-          if(Math.random()<pA){wL.push(idA);loL.push(idB);matchupStats[pk][idA]++;}
-          else{wL.push(idB);loL.push(idA);matchupStats[pk][idB]++;}
+          const winner = Math.random()<pA ? idA : idB;
+          const loser = winner === idA ? idB : idA;
+          wL.push(winner); loL.push(loser); matchupStats[pk][winner]++;
+          // İlk sim'de eleme kazananını kaydet
+          if (sim === 0) firstSimBracketPath[`${roundKey}_${pk}`] = winner;
         });
         wL.forEach(id=>{if(id&&stats[id])stats[id][nextKey]++;});
         const pairs=[]; for(let i=0;i<wL.length;i+=2){if(wL[i])pairs.push([wL[i],wL[i+1]]);}
@@ -1503,7 +1506,7 @@ export default function App() {
       stats[id].g3=(stats[id].g3/s)*100; stats[id].g4=(stats[id].g4/s)*100;
     });
 
-    return {teams:stats, matchups:matchupStats, encounters:encounterStats, displayScores:firstSimDisplayScores};
+    return {teams:stats, matchups:matchupStats, encounters:encounterStats, displayScores:firstSimDisplayScores, bracketPath:firstSimBracketPath};
   }
 
   const buildLiveBracket = () => {
@@ -1537,7 +1540,11 @@ export default function App() {
       const mKey = [idA, idB].sort().join("_vs_");
       const mh = simResults.matchups[mKey];
       let pA = mh && mh.total > 0 ? Math.round((mh[idA] / mh.total) * 100) : Math.round(getWinProbability(activeTeams[idA]?.elo || 1600, activeTeams[idB]?.elo || 1600) * 100);
-      return { idA, idB, pA, pB: 100 - pA, winner: pA >= 50 ? idA : idB, loser: pA >= 50 ? idB : idA };
+      // Bracket path'ten bu maçın sim=0 kazananını al
+      const bp = simResults.bracketPath || {};
+      const pathWinner = bp[`r16_${mKey}`] ?? bp[`qf_${mKey}`] ?? bp[`sf_${mKey}`] ?? bp[`f_${mKey}`];
+      const winner = pathWinner || (pA >= 50 ? idA : idB);
+      return { idA, idB, pA, pB: 100 - pA, winner, loser: winner === idA ? idB : idA };
     };
 
     const left_r32 = [
