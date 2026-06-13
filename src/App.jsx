@@ -1322,12 +1322,12 @@ export default function App() {
 
   // Monte Carlo tetikleyici
   useEffect(() => {
-    const results = runAdvancedSimulation(activeTeams, officialScores, officialKOScores);
+    const results = runAdvancedSimulation(activeTeams, officialScores);
     setSimResults(results);
     if (results && results.displayScores) {
       setSingleDisplayScores(results.displayScores);
     }
-  }, [officialScores, officialKOScores, customElo]);
+  }, [officialScores, customElo]);
 
   const handleScoreChange = (fixtureId, side, value) => {
     setUserScores(prev => ({ ...prev, [fixtureId]: { ...prev[fixtureId], [side]: value } }));
@@ -1348,7 +1348,7 @@ export default function App() {
   };
 
   // === MONTE CARLO SIMÜLASYON MOTORU ===
-  function runAdvancedSimulation(teams, officialGroupScores, officialKOScoresArg = {}) {
+  function runAdvancedSimulation(teams, userScores) {
     const SIM_COUNT = 10000;
     const stats = {};
     const matchupStats = {};
@@ -1357,7 +1357,6 @@ export default function App() {
     const encounterStats = {};
     const firstSimDisplayScores = {};
     const firstSimBracketPath = {}; // sim=0'daki eleme turu sonuçları
-    const firstSimGroupRankings = {}; // sim=0'daki grup sıralamaları
     Object.keys(teams).forEach(id => {
       stats[id] = { id, r32:0,r16:0,qf:0,sf:0,f:0,champion:0,thirdPlaceChamp:0,g1:0,g2:0,g3:0,g4:0 };
       encounterStats[id] = {};
@@ -1391,7 +1390,7 @@ export default function App() {
       Object.keys(teams).forEach(id => { points[id]=0; gd[id]=0; gf[id]=0; });
       
       fixtures.forEach(f => {
-        const saved = officialGroupScores[f.id]; // Sadece resmi onaylı grup skorları simülasyonu kilitler
+        const saved = officialScores[f.id]; // Sadece resmi onaylı skorlar simülasyonu kilitler
         let hG = 0; let aG = 0;
 
         if (saved && saved.home !== "" && saved.away !== "") {
@@ -1423,14 +1422,10 @@ export default function App() {
         if(stats[sorted[1]])stats[sorted[1]].g2++;
         if(stats[sorted[2]])stats[sorted[2]].g3++;
         if(stats[sorted[3]])stats[sorted[3]].g4++;
-        // sim=0'da grup sıralamalarını kaydet
-        if (sim === 0) firstSimGroupRankings[gName] = [...sorted];
       });
 
       const bestThirds = [...thirds].sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || b.elo - a.elo);
-      const qualifiedThirds = bestThirds.slice(0,8);
-      // sim=0'da 3.'leri kaydet
-      if (sim === 0) firstSimGroupRankings["_qualifiedThirds"] = qualifiedThirds.map(t=>({...t}));
+      const qualifiedThirds = bestThirds.slice(0,8); // Değişkeni burada tanımlıyoruz
       
       // Şimdi qualifiedThirds artık erişilebilir durumda
       const qualifiedLetters = qualifiedThirds.map(t => t.group).sort().join("");
@@ -1473,19 +1468,8 @@ export default function App() {
           if(!matchupStats[pk]) matchupStats[pk]={total:0,[idA]:0,[idB]:0};
           matchupStats[pk].total++;
           addEncounter(idA, idB, roundKey, groupPos[idA], groupPos[idB]);
-
-          // Resmi KO skoru varsa onu kullan, yoksa ELO bazlı simüle et
-          const koKey = `ko_${[idA,idB].sort().join("_")}`;
-          const koSc = officialKOScoresArg[koKey];
-          let winner;
-          if (koSc && koSc.home !== "" && koSc.away !== "" && koSc.home !== undefined && koSc.away !== undefined) {
-            const sorted = [idA,idB].sort();
-            const h = parseInt(koSc.home), a = parseInt(koSc.away);
-            winner = (!isNaN(h) && !isNaN(a) && h !== a) ? (h > a ? sorted[0] : sorted[1]) : sorted[0];
-          } else {
-            const pA=getWinProbability(teams[idA].elo,teams[idB].elo);
-            winner = Math.random()<pA ? idA : idB;
-          }
+          const pA=getWinProbability(teams[idA].elo,teams[idB].elo);
+          const winner = Math.random()<pA ? idA : idB;
           const loser = winner === idA ? idB : idA;
           wL.push(winner); loL.push(loser); matchupStats[pk][winner]++;
           // İlk sim'de eleme kazananını kaydet
@@ -1501,23 +1485,13 @@ export default function App() {
       const sfM=sfR.pairs;
       if(sfM.length>=2){
         const sf1A=sfM[0][0],sf1B=sfM[0][1],sf2A=sfM[1][0],sf2B=sfM[1][1];
-        const resolveKO = (idA, idB) => {
-          const koKey = `ko_${[idA,idB].sort().join("_")}`;
-          const koSc = officialKOScoresArg[koKey];
-          if (koSc && koSc.home !== "" && koSc.away !== "" && koSc.home !== undefined && koSc.away !== undefined) {
-            const sorted = [idA,idB].sort();
-            const h = parseInt(koSc.home), a = parseInt(koSc.away);
-            return (!isNaN(h) && !isNaN(a) && h !== a) ? (h > a ? sorted[0] : sorted[1]) : sorted[0];
-          }
-          return Math.random()<getWinProbability(teams[idA].elo,teams[idB].elo) ? idA : idB;
-        };
-        const w1=resolveKO(sf1A,sf1B); const l1=w1===sf1A?sf1B:sf1A;
-        const w2=resolveKO(sf2A,sf2B); const l2=w2===sf2A?sf2B:sf2A;
+        const w1=Math.random()<getWinProbability(teams[sf1A].elo,teams[sf1B].elo)?sf1A:sf1B; const l1=w1===sf1A?sf1B:sf1A;
+        const w2=Math.random()<getWinProbability(teams[sf2A].elo,teams[sf2B].elo)?sf2A:sf2B; const l2=w2===sf2A?sf2B:sf2A;
         addEncounter(w1, w2, "f", groupPos[w1], groupPos[w2]); // Final
-        const champ=resolveKO(w1,w2);
+        const champ=Math.random()<getWinProbability(teams[w1].elo,teams[w2].elo)?w1:w2;
         if(stats[champ])stats[champ].champion++;
         addEncounter(l1, l2, "f", groupPos[l1], groupPos[l2]); // 3.lük
-        const tpw=resolveKO(l1,l2);
+        const tpw=Math.random()<getWinProbability(teams[l1].elo,teams[l2].elo)?l1:l2;
         if(stats[tpw])stats[tpw].thirdPlaceChamp++;
       }
     }
@@ -1532,42 +1506,16 @@ export default function App() {
       stats[id].g3=(stats[id].g3/s)*100; stats[id].g4=(stats[id].g4/s)*100;
     });
 
-    return {teams:stats, matchups:matchupStats, encounters:encounterStats, displayScores:firstSimDisplayScores, bracketPath:firstSimBracketPath, groupRankings:firstSimGroupRankings};
+    return {teams:stats, matchups:matchupStats, encounters:encounterStats, displayScores:firstSimDisplayScores, bracketPath:firstSimBracketPath};
   }
 
   const buildLiveBracket = () => {
     if (!simResults || !liveTableData.groups || Object.keys(liveTableData.groups).length === 0) return null;
-
-    const gr = simResults.groupRankings || {};
-
-    // Her grup için: resmi skor girilmişse liveTableData, yoksa sim=0 sıralaması kullan
-    const getTop = (g) => {
-      const live = (liveTableData.groups[g] || []).map(t => t.id);
-      // Bu gruptaki herhangi bir maçta resmi skor var mı?
-      const fixtures = generateAllFixtures().filter(f => f.group === g);
-      const hasOfficial = fixtures.some(f => {
-        const sc = officialScores[f.id];
-        return sc && sc.home !== "" && sc.away !== "";
-      });
-      return hasOfficial ? live : (gr[g] || live);
-    };
-
-    // 3.'ler için sim=0'dan al; resmi skorlar varsa liveTableData'dan
-    const simQT = gr["_qualifiedThirds"] || [];
-    const hasAnyOfficial = Object.values(officialScores).some(sc => sc && sc.home !== "" && sc.away !== "");
-
+    
+    const getTop = (g) => (liveTableData.groups[g] || []).map(t => t.id);
+    
     const allThirds = Object.keys(GROUPS_CONFIG).map(g => getTop(g)[2]);
-
-    // Sıralama: resmi skor varsa liveTableData puan/gol ortalamasına göre, yoksa sim=0 qualified sıralamasına göre
-    const simQTIds = simQT.map(t => t.id);
     const sortedThirds = [...allThirds].sort((a, b) => {
-      if (!hasAnyOfficial) {
-        // Sim=0 sıralamasını kullan: qualified olanlar önce, sonra sim sırasına göre
-        const ai = simQTIds.indexOf(a), bi = simQTIds.indexOf(b);
-        if (ai !== -1 && bi !== -1) return ai - bi;
-        if (ai !== -1) return -1;
-        if (bi !== -1) return 1;
-      }
       const tB = liveTableData.thirds.find(x => x.id === b) || { pts: 0, gd: 0 };
       const tA = liveTableData.thirds.find(x => x.id === a) || { pts: 0, gd: 0 };
       return tB.pts - tA.pts || tB.gd - tA.gd || activeTeams[b].elo - activeTeams[a].elo;
@@ -1593,7 +1541,10 @@ export default function App() {
       const mh = simResults.matchups[mKey];
       let pA = mh && mh.total > 0 ? Math.round((mh[idA] / mh.total) * 100) : Math.round(getWinProbability(activeTeams[idA]?.elo || 1600, activeTeams[idB]?.elo || 1600) * 100);
       // Bracket path'ten bu maçın sim=0 kazananını al
-      return { idA, idB, pA, pB: 100 - pA, winner: pA >= 50 ? idA : idB, loser: pA >= 50 ? idB : idA };
+      const bp = simResults.bracketPath || {};
+      const pathWinner = bp[`r16_${mKey}`] ?? bp[`qf_${mKey}`] ?? bp[`sf_${mKey}`] ?? bp[`f_${mKey}`];
+      const winner = pathWinner || (pA >= 50 ? idA : idB);
+      return { idA, idB, pA, pB: 100 - pA, winner, loser: winner === idA ? idB : idA };
     };
 
     const left_r32 = [
