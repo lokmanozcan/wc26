@@ -861,70 +861,348 @@ export default function App() {
     link.click();
   };
 
-  const downloadBracket = () => {
-    if (!bracketPanelRef.current) return;
-    const el = bracketPanelRef.current;
+  const downloadBracket = async () => {
+    const bracket = buildLiveBracket();
+    if (!bracket) return;
 
-    const loadH2C = (cb) => {
-      if (window.html2canvas) { cb(); return; }
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-      s.onload = cb; document.head.appendChild(s);
+    const DPR = 2.5;
+
+    // Tüm bracket takımlarını yükle
+    const allBracketIds = new Set();
+    const addMatch = (m) => { if (m?.idA) allBracketIds.add(m.idA); if (m?.idB) allBracketIds.add(m.idB); };
+    [...bracket.left_r32, ...bracket.left_r16, ...bracket.left_qf,
+     ...bracket.right_r32, ...bracket.right_r16, ...bracket.right_qf].forEach(addMatch);
+    addMatch(bracket.left_sf); addMatch(bracket.right_sf);
+    addMatch(bracket.finalMatch); addMatch(bracket.thirdPlaceMatch);
+    await preloadFlags([...allBracketIds]);
+
+    // --- Layout ---
+    const CARD_W    = 130;
+    const CARD_H    = 52;  // 2 satır (her biri 24px) + 4px padding
+    const ROW_H     = 24;
+    const COL_GAP   = 18;
+    const PAD       = 20;
+    const CENTER_W  = 200;
+    const COLS      = 4; // her yanda 4 sütun: r32, r16, qf, sf
+    const SIDE_W    = COLS * CARD_W + (COLS - 1) * COL_GAP;
+    const TOTAL_W   = PAD * 2 + SIDE_W * 2 + COL_GAP * 2 + CENTER_W;
+
+    // Her sütundaki maç sayısı: r32=8, r16=4, qf=2, sf=1
+    const MATCHES_PER_COL = [8, 4, 2, 1];
+    const HEADER_H  = 36;
+    const MAX_MATCHES = 8;
+    const BRACKET_H = MAX_MATCHES * CARD_H + (MAX_MATCHES - 1) * 6; // 6px gap
+    const THIRD_H   = CARD_H + 8;
+    const TOTAL_H   = PAD + HEADER_H + BRACKET_H + 20 + THIRD_H + PAD;
+
+    const canvas = document.createElement("canvas");
+    canvas.width  = TOTAL_W * DPR;
+    canvas.height = TOTAL_H * DPR;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(DPR, DPR);
+
+    // Arka plan
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(0, 0, TOTAL_W, TOTAL_H);
+
+    // Header şeridi
+    ctx.fillStyle = "#0f172a";
+    roundRect(ctx, PAD, PAD, TOTAL_W - PAD * 2, HEADER_H, 10);
+    ctx.fill();
+    ctx.font = "bold 14px system-ui,sans-serif";
+    ctx.fillStyle = "#f59e0b";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("2026 FIFA DÜNYA KUPASI — TURNUVA AĞACI", TOTAL_W / 2, PAD + HEADER_H / 2);
+
+    // Sütun başlıkları
+    const colLabels = ["SON 32", "SON 16", "ÇEYREK F.", "YARI F."];
+    ctx.font = "bold 8.5px system-ui";
+    ctx.fillStyle = "#94a3b8";
+    ctx.textAlign = "center";
+    const leftColX  = (ci) => PAD + ci * (CARD_W + COL_GAP) + CARD_W / 2;
+    const rightColX = (ci) => PAD + SIDE_W + COL_GAP * 2 + CENTER_W + ci * (CARD_W + COL_GAP) + CARD_W / 2;
+    const COL_LABEL_Y = PAD + HEADER_H + 10;
+    colLabels.forEach((lbl, ci) => {
+      ctx.fillText(lbl, leftColX(ci), COL_LABEL_Y);
+      ctx.fillText(colLabels[COLS - 1 - ci], rightColX(ci), COL_LABEL_Y);
+    });
+
+    const BRACKET_TOP = PAD + HEADER_H + 22;
+
+    // Maç kartı çizici
+    const drawMatchCard = (m, x, y, knockoutScores) => {
+      const score = (() => {
+        if (!m?.idA || !m?.idB) return undefined;
+        const key = `ko_${[m.idA, m.idB].sort().join("_")}`;
+        const s = knockoutScores[key];
+        if (!s) return undefined;
+        const storedA = [m.idA, m.idB].sort()[0];
+        return m.idA === storedA ? s : { home: s.away, away: s.home };
+      })();
+
+      const hasScore = score && score.home !== "" && score.away !== "" && score.home !== undefined;
+      const sw = hasScore ? scoreWinner(score) : null;
+      const actualWinner = hasScore ? (sw === "home" || sw === "draw" ? m?.idA : m?.idB) : m?.winner;
+
+      // Kart arka plan
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, x, y, CARD_W, CARD_H, 7);
+      ctx.fill();
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth = 1;
+      roundRect(ctx, x, y, CARD_W, CARD_H, 7);
+      ctx.stroke();
+
+      // Canlı skor noktası
+      if (hasScore) {
+        ctx.fillStyle = "#10b981";
+        ctx.beginPath();
+        ctx.arc(x + CARD_W - 6, y + 6, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // İki takım satırı
+      [[m?.idA, score?.home, actualWinner === m?.idA],
+       [m?.idB, score?.away, actualWinner === m?.idB]].forEach(([id, sc, isWin], ri) => {
+        const ry = y + ri * ROW_H + 2;
+        const midY = ry + ROW_H / 2;
+        const nameText = INITIAL_TEAMS[id]?.name || "---";
+
+        // Kazanan arka planı
+        if (isWin) {
+          ctx.fillStyle = "rgba(16,185,129,0.10)";
+          roundRect(ctx, x + 2, ry, CARD_W - 4, ROW_H - 1, 4);
+          ctx.fill();
+          // Sol accent çizgisi
+          ctx.fillStyle = "#10b981";
+          ctx.fillRect(x + 2, ry + 2, 2.5, ROW_H - 5);
+        }
+
+        // Bayrak
+        const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
+        if (flag) ctx.drawImage(flag, x + 8, midY - 5.5, 16, 11);
+
+        // Takım adı (kırpma)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x + 28, ry, CARD_W - 28 - 22, ROW_H);
+        ctx.clip();
+        ctx.font = isWin ? "700 10px system-ui" : "500 10px system-ui";
+        ctx.fillStyle = isWin ? "#047857" : "#374151";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(nameText, x + 28, midY);
+        ctx.restore();
+
+        // Skor veya yüzde
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        if (hasScore) {
+          ctx.font = "900 11px monospace";
+          ctx.fillStyle = isWin ? "#047857" : "#94a3b8";
+          ctx.fillText(String(sc), x + CARD_W - 5, midY);
+        } else {
+          ctx.font = "700 9.5px monospace";
+          ctx.fillStyle = isWin ? "#047857" : "#64748b";
+          ctx.fillText(`${m?.[ri === 0 ? "pA" : "pB"] ?? 50}%`, x + CARD_W - 5, midY);
+        }
+      });
     };
 
-    loadH2C(async () => {
-      const prevScrollY = window.scrollY;
-      window.scrollTo({ top: 0, behavior: "instant" });
-      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    // Bir sütunun maçlarını eşit aralıklarla diz
+    const getMatchY = (matchIdx, totalMatches) => {
+      const slotH = BRACKET_H / MAX_MATCHES;
+      const groupSize = MAX_MATCHES / totalMatches;
+      const groupStart = matchIdx * groupSize;
+      const centerSlot = groupStart + groupSize / 2 - 0.5;
+      return BRACKET_TOP + centerSlot * slotH + (slotH - CARD_H) / 2;
+    };
 
-      const sw = el.querySelector(".bracket-scroll-wrapper");
-      const swPrevStyle = sw ? sw.getAttribute("style") || "" : null;
-      const innerW = sw ? sw.scrollWidth : el.scrollWidth;
+    // Sol taraf
+    const leftCols = [bracket.left_r32, bracket.left_r16, bracket.left_qf, [bracket.left_sf]];
+    leftCols.forEach((matches, ci) => {
+      const x = PAD + ci * (CARD_W + COL_GAP);
+      matches.forEach((m, mi) => {
+        const y = getMatchY(mi, matches.length);
+        drawMatchCard(m, x, y, knockoutScores);
+      });
+    });
 
-      if (sw) {
-        sw.style.overflow  = "visible";
-        sw.style.width     = innerW + "px";
-        sw.style.minWidth  = innerW + "px";
-        sw.style.maxWidth  = "none";
-      }
+    // Sol bağlantı çizgileri
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 1.5;
+    leftCols.forEach((matches, ci) => {
+      if (ci >= leftCols.length - 1) return;
+      const nextMatches = leftCols[ci + 1];
+      const x1 = PAD + ci * (CARD_W + COL_GAP) + CARD_W;
+      const x2 = PAD + (ci + 1) * (CARD_W + COL_GAP);
+      const midX = (x1 + x2) / 2;
+      nextMatches.forEach((_, ni) => {
+        const mA = matches[ni * 2];
+        const mB = matches[ni * 2 + 1];
+        if (!mA || !mB) return;
+        const y1 = getMatchY(ni * 2, matches.length) + CARD_H / 2;
+        const y2 = getMatchY(ni * 2 + 1, matches.length) + CARD_H / 2;
+        const yT = getMatchY(ni, nextMatches.length) + CARD_H / 2;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1); ctx.lineTo(midX, y1);
+        ctx.lineTo(midX, y2); ctx.moveTo(midX, yT);
+        ctx.lineTo(x2, yT);
+        ctx.stroke();
+      });
+    });
 
-      const prevWidth    = el.style.width;
-      const prevMinWidth = el.style.minWidth;
-      el.style.width    = innerW + "px";
-      el.style.minWidth = innerW + "px";
-      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    // Sağ taraf
+    const rightCols = [[bracket.right_sf], bracket.right_qf, bracket.right_r16, bracket.right_r32];
+    const rightStartX = PAD + SIDE_W + COL_GAP * 2 + CENTER_W;
+    rightCols.forEach((matches, ci) => {
+      const x = rightStartX + ci * (CARD_W + COL_GAP);
+      matches.forEach((m, mi) => {
+        const y = getMatchY(mi, matches.length);
+        drawMatchCard(m, x, y, knockoutScores);
+      });
+    });
 
-      const r2 = el.getBoundingClientRect();
-      const H = Math.round(el.scrollHeight);
+    // Sağ bağlantı çizgileri (sağdan sola)
+    rightCols.forEach((matches, ci) => {
+      if (ci >= rightCols.length - 1) return;
+      const nextMatches = rightCols[ci + 1];
+      const x1 = rightStartX + ci * (CARD_W + COL_GAP) + CARD_W;
+      const x2 = rightStartX + (ci + 1) * (CARD_W + COL_GAP);
+      const midX = (x1 + x2) / 2;
+      matches.forEach((_, ni) => {
+        const mA = nextMatches[ni * 2];
+        const mB = nextMatches[ni * 2 + 1];
+        if (!mA || !mB) return;
+        const y1 = getMatchY(ni * 2, nextMatches.length) + CARD_H / 2;
+        const y2 = getMatchY(ni * 2 + 1, nextMatches.length) + CARD_H / 2;
+        const yT = getMatchY(ni, matches.length) + CARD_H / 2;
+        ctx.beginPath();
+        ctx.moveTo(x2, y1); ctx.lineTo(midX, y1);
+        ctx.lineTo(midX, y2); ctx.moveTo(midX, yT);
+        ctx.lineTo(x1, yT);
+        ctx.stroke();
+      });
+    });
 
-      try {
-        const canvas = await window.html2canvas(document.documentElement, {
-          scale: 2.5,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#f8fafc",
-          logging: false,
-          imageTimeout: 15000,
-          x: Math.round(r2.left),
-          y: Math.round(r2.top),
-          width:  innerW,
-          height: H,
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth:  innerW + 100,
-          windowHeight: document.documentElement.scrollHeight,
-        });
-        const link = document.createElement("a");
-        link.download = "turnuva_agaci_wc26.png";
-        link.href = canvas.toDataURL("image/png", 1.0);
-        link.click();
-      } finally {
-        el.style.width    = prevWidth;
-        el.style.minWidth = prevMinWidth;
-        if (sw && swPrevStyle !== null) sw.setAttribute("style", swPrevStyle);
-        window.scrollTo({ top: prevScrollY, behavior: "instant" });
+    // ── MERKEZ: FİNAL BLOĞU ──
+    const CX = PAD + SIDE_W + COL_GAP;
+    const sfLY = getMatchY(0, 1) + CARD_H / 2;
+    const sfRY = getMatchY(0, 1) + CARD_H / 2;
+    const centerMidY = (sfLY + sfRY) / 2;
+    const finalBlockH = 130;
+    const finalY = BRACKET_TOP + BRACKET_H / 2 - finalBlockH / 2;
+
+    // Sol SF → Final bağlantısı
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 1.5;
+    const lsfX = PAD + SIDE_W;
+    const rsfX = rightStartX;
+    ctx.beginPath();
+    ctx.moveTo(lsfX + CARD_W, sfLY);
+    ctx.lineTo(CX, sfLY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(rsfX, sfRY);
+    ctx.lineTo(CX + CENTER_W, sfRY);
+    ctx.stroke();
+
+    // Final kutusu arka plan
+    ctx.fillStyle = "#0a0f1e";
+    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 12);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(245,158,11,0.4)";
+    ctx.lineWidth = 1;
+    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 12);
+    ctx.stroke();
+
+    // Final başlık şeridi
+    const grad = ctx.createLinearGradient(CX, 0, CX + CENTER_W, 0);
+    grad.addColorStop(0, "#d97706"); grad.addColorStop(1, "#f59e0b");
+    ctx.fillStyle = grad;
+    roundRect(ctx, CX, finalY, CENTER_W, 22, 12);
+    ctx.fill();
+    ctx.fillRect(CX, finalY + 10, CENTER_W, 12);
+    ctx.font = "900 8.5px system-ui";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("★  FİNAL  ★", CX + CENTER_W / 2, finalY + 11);
+
+    // Final finalistleri
+    [[bracket.finalMatch.idA, bracket.finalMatch.pA, bracket.finalMatch.winner === bracket.finalMatch.idA],
+     [bracket.finalMatch.idB, bracket.finalMatch.pB, bracket.finalMatch.winner === bracket.finalMatch.idB]
+    ].forEach(([id, pct, isWin], ri) => {
+      const fy = finalY + 26 + ri * 28;
+      const midY = fy + 13;
+      ctx.fillStyle = isWin ? "rgba(245,158,11,0.18)" : "rgba(255,255,255,0.05)";
+      roundRect(ctx, CX + 6, fy, CENTER_W - 12, 26, 6);
+      ctx.fill();
+      ctx.strokeStyle = isWin ? "rgba(245,158,11,0.4)" : "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 1;
+      roundRect(ctx, CX + 6, fy, CENTER_W - 12, 26, 6);
+      ctx.stroke();
+      const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
+      if (flag) ctx.drawImage(flag, CX + 12, midY - 6, 18, 12);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(CX + 34, fy, CENTER_W - 34 - 28, 26); ctx.clip();
+      ctx.font = isWin ? "800 11px system-ui" : "600 11px system-ui";
+      ctx.fillStyle = isWin ? "#fbbf24" : "rgba(255,255,255,0.7)";
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 34, midY);
+      ctx.restore();
+      ctx.font = "800 9.5px monospace";
+      ctx.fillStyle = isWin ? "#fbbf24" : "rgba(255,255,255,0.4)";
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(`${pct}%`, CX + CENTER_W - 8, midY);
+      if (ri === 0) {
+        const barY = fy + 26 + 2;
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        roundRect(ctx, CX + 6, barY, CENTER_W - 12, 4, 2); ctx.fill();
+        ctx.fillStyle = "#10b981";
+        roundRect(ctx, CX + 6, barY, (CENTER_W - 12) * bracket.finalMatch.pA / 100, 4, 2); ctx.fill();
       }
     });
+
+    // Şampiyon bloğu
+    const champY = finalY + 26 + 2 * 28 + 4 + 8;
+    ctx.fillStyle = "rgba(217,119,6,0.18)";
+    roundRect(ctx, CX + 6, champY, CENTER_W - 12, 34, 8); ctx.fill();
+    ctx.strokeStyle = "rgba(245,158,11,0.4)"; ctx.lineWidth = 1;
+    roundRect(ctx, CX + 6, champY, CENTER_W - 12, 34, 8); ctx.stroke();
+    ctx.font = "900 7.5px monospace";
+    ctx.fillStyle = "rgba(251,191,36,0.7)";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("DÜNYA ŞAMPİYONU", CX + CENTER_W / 2, champY + 9);
+    const wId = bracket.finalMatch.winner;
+    const wFlag = flagCache.current[INITIAL_TEAMS[wId]?.iso?.toLowerCase()];
+    const wName = INITIAL_TEAMS[wId]?.name || "---";
+    if (wFlag) ctx.drawImage(wFlag, CX + CENTER_W / 2 - 40, champY + 16, 22, 15);
+    ctx.font = "900 12px system-ui";
+    ctx.fillStyle = "#fbbf24";
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(wName, CX + CENTER_W / 2 - 14, champY + 24);
+
+    // ── ÜÇÜNCÜLÜK MAÇI ──
+    const thirdY = BRACKET_TOP + BRACKET_H + 16;
+    const thirdBlockW = CARD_W * 2 + COL_GAP;
+    const thirdX = TOTAL_W / 2 - thirdBlockW / 2;
+
+    ctx.fillStyle = "#7c3aed";
+    roundRect(ctx, thirdX, thirdY, thirdBlockW, 18, 6); ctx.fill();
+    ctx.font = "900 8px system-ui";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("★  ÜÇÜNCÜLÜK MAÇI  ★", thirdX + thirdBlockW / 2, thirdY + 9);
+
+    drawMatchCard(bracket.thirdPlaceMatch, thirdX, thirdY + 20, knockoutScores);
+
+    // İndir
+    const link = document.createElement("a");
+    link.download = "turnuva_agaci_wc26.png";
+    link.href = canvas.toDataURL("image/png", 1.0);
+    link.click();
   };
 
   // --- ELO otomatik güncelleme (saatte bir) ---
