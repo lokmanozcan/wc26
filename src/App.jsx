@@ -611,18 +611,313 @@ export default function App() {
   const groupsPanelRef = useRef(null);
   const bracketPanelRef = useRef(null);
 
-  // ── Görsel indirme — layout-lock + offscreen ──────────────────────────────
-  const loadHtml2Canvas = (cb) => {
-    if (window.html2canvas) { cb(); return; }
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-    s.onload = cb;
-    document.head.appendChild(s);
+  // ── PURE CANVAS RENDERER — html2canvas bağımlılığı yok ───────────────────
+  // Bayrak görsellerini önbelleğe alır
+  const flagCache = useRef({});
+  const loadFlag = (iso) => new Promise(resolve => {
+    if (!iso) return resolve(null);
+    const key = iso.toLowerCase();
+    if (flagCache.current[key]) return resolve(flagCache.current[key]);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload  = () => { flagCache.current[key] = img; resolve(img); };
+    img.onerror = () => resolve(null);
+    img.src = getFlagUrl(iso);
+  });
+
+  // Tüm takım bayraklarını önceden yükle
+  const preloadFlags = async (ids) => {
+    await Promise.all(ids.map(id => loadFlag(INITIAL_TEAMS[id]?.iso)));
   };
 
-  const downloadAsImage = (ref, filename) => {
-    if (!ref.current) return;
-    const el = ref.current;
+  // Yuvarlak köşeli dikdörtgen helper
+  const roundRect = (ctx, x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
+
+  const downloadAsImage = async (ref, filename) => {
+    const DPR = 3; // Twitter için yüksek çözünürlük
+
+    // Tüm grup takımlarını ve 3.leri önceden yükle
+    const allIds = Object.values(GROUPS_CONFIG).flat();
+    await preloadFlags(allIds);
+
+    // --- Layout sabitleri ---
+    const MARGIN        = 16;
+    const GAP           = 10;
+    const GROUP_COLS    = 4;
+    const GROUP_ROWS    = 3;
+    const THIRDS_W      = 270;
+    const CARD_HEADER_H = 28;
+    const ROW_H         = 26;
+    const CARD_PAD      = 10;
+    const CARD_H        = CARD_HEADER_H + 4 * ROW_H + CARD_PAD;
+
+    const GROUPS_W      = ref.current ? ref.current.getBoundingClientRect().width - THIRDS_W - GAP - MARGIN * 2 : 960;
+    const CARD_W        = (GROUPS_W - (GROUP_COLS - 1) * GAP) / GROUP_COLS;
+
+    const TOTAL_W  = MARGIN * 2 + GROUPS_W + GAP + THIRDS_W;
+    const TOTAL_H  = MARGIN * 2 + GROUP_ROWS * CARD_H + (GROUP_ROWS - 1) * GAP;
+
+    const canvas  = document.createElement("canvas");
+    canvas.width  = TOTAL_W  * DPR;
+    canvas.height = TOTAL_H  * DPR;
+    const ctx     = canvas.getContext("2d");
+    ctx.scale(DPR, DPR);
+
+    // Arka plan
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(0, 0, TOTAL_W, TOTAL_H);
+
+    // Grup kartlarını çiz
+    const groupNames = Object.keys(GROUPS_CONFIG);
+    const qualifiedThirdIds = new Set((liveTableData.thirds || []).slice(0, 8).map(t => t.id));
+
+    for (let gi = 0; gi < groupNames.length; gi++) {
+      const gName = groupNames[gi];
+      const col   = gi % GROUP_COLS;
+      const row   = Math.floor(gi / GROUP_COLS);
+      const cx    = MARGIN + col * (CARD_W + GAP);
+      const cy    = MARGIN + row * (CARD_H  + GAP);
+
+      // Kart arka planı
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, cx, cy, CARD_W, CARD_H, 10);
+      ctx.fill();
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.lineWidth   = 1;
+      roundRect(ctx, cx, cy, CARD_W, CARD_H, 10);
+      ctx.stroke();
+
+      // Grup başlığı
+      ctx.font         = "bold 10px system-ui,sans-serif";
+      ctx.fillStyle    = "#047857";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`GRUP ${gName}`, cx + CARD_PAD, cy + 14);
+
+      // AV / P başlıkları
+      ctx.font      = "bold 9px monospace";
+      ctx.fillStyle = "#1d4ed8";
+      ctx.textAlign = "right";
+      ctx.fillText("AV", cx + CARD_W - 26, cy + 14);
+      ctx.fillStyle = "#0f172a";
+      ctx.fillText("P",  cx + CARD_W - CARD_PAD, cy + 14);
+      ctx.textAlign = "left";
+
+      // Başlık alt çizgisi
+      ctx.fillStyle   = "#f0fdf4";
+      ctx.fillRect(cx + CARD_PAD, cy + CARD_HEADER_H - 2, CARD_W - CARD_PAD * 2, 2);
+
+      // Takım satırları
+      const sorted = liveTableData.groups[gName] || [];
+      for (let ri = 0; ri < 4; ri++) {
+        const item = sorted[ri];
+        if (!item) continue;
+        const id    = item.id;
+        const ry    = cy + CARD_HEADER_H + ri * ROW_H;
+        const isTop2  = ri < 2;
+        const isQThird = ri === 2 && qualifiedThirdIds.has(id);
+
+        // Satır arkaplanı
+        if (isTop2) {
+          ctx.fillStyle = "rgba(16,185,129,0.09)";
+          roundRect(ctx, cx + 4, ry + 1, CARD_W - 8, ROW_H - 2, 5);
+          ctx.fill();
+          // Sol accent
+          ctx.fillStyle = "#10b981";
+          ctx.fillRect(cx + 4, ry + 2, 3, ROW_H - 4);
+        } else if (isQThird) {
+          ctx.fillStyle = "rgba(249,115,22,0.09)";
+          roundRect(ctx, cx + 4, ry + 1, CARD_W - 8, ROW_H - 2, 5);
+          ctx.fill();
+          ctx.fillStyle = "#f97316";
+          ctx.fillRect(cx + 4, ry + 2, 3, ROW_H - 4);
+        }
+
+        const midY = ry + ROW_H / 2;
+
+        // Sıra numarası
+        ctx.font      = "bold 9px monospace";
+        ctx.fillStyle = isTop2 ? "#059669" : isQThird ? "#ea580c" : "#94a3b8";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(ri + 1), cx + 16, midY);
+
+        // Bayrak
+        const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
+        if (flag) ctx.drawImage(flag, cx + 22, midY - 6, 17, 12);
+
+        // Takım adı
+        ctx.font      = isTop2 || isQThird ? "700 11.5px system-ui" : "500 11.5px system-ui";
+        ctx.fillStyle = isTop2 ? "#065f46" : isQThird ? "#9a3412" : "#374151";
+        ctx.textAlign = "left";
+        ctx.fillText(INITIAL_TEAMS[id]?.name || "", cx + 43, midY);
+
+        // AV
+        const gd = item.gd;
+        ctx.font      = "700 11px monospace";
+        ctx.fillStyle = gd > 0 ? "#1d4ed8" : gd < 0 ? "#dc2626" : "#94a3b8";
+        ctx.textAlign = "right";
+        ctx.fillText(gd > 0 ? `+${gd}` : String(gd), cx + CARD_W - 26, midY);
+
+        // P
+        ctx.font      = "900 11.5px monospace";
+        ctx.fillStyle = isTop2 ? "#047857" : isQThird ? "#ea580c" : "#0f172a";
+        ctx.fillText(String(item.pts), cx + CARD_W - CARD_PAD, midY);
+        ctx.textAlign = "left";
+      }
+    }
+
+    // ── 3.LER PANELİ ─────────────────────────────────────────────────────────
+    const TX = MARGIN + GROUPS_W + GAP;
+    const TY = MARGIN;
+    const TH = TOTAL_H - MARGIN * 2;
+
+    ctx.fillStyle = "#ffffff";
+    roundRect(ctx, TX, TY, THIRDS_W, TH, 10);
+    ctx.fill();
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth   = 1;
+    roundRect(ctx, TX, TY, THIRDS_W, TH, 10);
+    ctx.stroke();
+
+    // Başlık
+    ctx.font      = "bold 10.5px system-ui";
+    ctx.fillStyle = "#047857";
+    ctx.textBaseline = "middle";
+    ctx.fillText("EN İYİ 3.LER", TX + 26, TY + 14);
+    ctx.font      = "bold 9px monospace";
+    ctx.fillStyle = "#1d4ed8";
+    ctx.textAlign = "right";
+    ctx.fillText("AV", TX + THIRDS_W - 26, TY + 14);
+    ctx.fillStyle = "#0f172a";
+    ctx.fillText("P",  TX + THIRDS_W - CARD_PAD, TY + 14);
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#f0fdf4";
+    ctx.fillRect(TX + CARD_PAD, TY + CARD_HEADER_H - 2, THIRDS_W - CARD_PAD * 2, 2);
+
+    // Satırlar
+    const thirds = bracket?.sortedThirds || [];
+    const qualThirds = new Set(bracket?.qualifiedThirds || []);
+    const TROW_H = (TH - CARD_HEADER_H - CARD_PAD) / Math.max(thirds.length, 12);
+
+    for (let ti = 0; ti < thirds.length; ti++) {
+      const id    = thirds[ti];
+      const isQ   = qualThirds.has(id);
+      const tData = (liveTableData.thirds || []).find(x => x.id === id) || { pts: 0, gd: 0 };
+      const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id)) || "";
+      const ry    = TY + CARD_HEADER_H + ti * TROW_H;
+      const midY  = ry + TROW_H / 2;
+
+      if (isQ) {
+        ctx.fillStyle = "rgba(249,115,22,0.09)";
+        roundRect(ctx, TX + 4, ry + 1, THIRDS_W - 8, TROW_H - 2, 5);
+        ctx.fill();
+        ctx.fillStyle = "#f97316";
+        ctx.fillRect(TX + 4, ry + 2, 3, TROW_H - 4);
+      }
+
+      ctx.font      = "bold 9px monospace";
+      ctx.fillStyle = isQ ? "#ea580c" : "#94a3b8";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(ti + 1), TX + 16, midY);
+
+      const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
+      if (flag) ctx.drawImage(flag, TX + 22, midY - 6, 17, 12);
+
+      ctx.font      = isQ ? "700 11px system-ui" : "500 11px system-ui";
+      ctx.fillStyle = isQ ? "#9a3412" : "#374151";
+      ctx.textAlign = "left";
+      const name = INITIAL_TEAMS[id]?.name || "";
+      ctx.fillText(`${name} (${gLetter})`, TX + 43, midY);
+
+      const gd = tData.gd;
+      ctx.font      = "700 10.5px monospace";
+      ctx.fillStyle = isQ ? (gd > 0 ? "#1d4ed8" : gd < 0 ? "#dc2626" : "#94a3b8") : "#94a3b8";
+      ctx.textAlign = "right";
+      ctx.fillText(gd > 0 ? `+${gd}` : String(gd), TX + THIRDS_W - 26, midY);
+
+      ctx.font      = "900 11px monospace";
+      ctx.fillStyle = isQ ? "#ea580c" : "#374151";
+      ctx.fillText(String(tData.pts), TX + THIRDS_W - CARD_PAD, midY);
+      ctx.textAlign = "left";
+    }
+
+    // İndir
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = canvas.toDataURL("image/png", 1.0);
+    link.click();
+  };
+
+  const downloadBracket = () => {
+    // Bracket için html2canvas kullanmaya devam et (karmaşık connector çizgileri var)
+    if (!bracketPanelRef.current) return;
+    const el = bracketPanelRef.current;
+
+    const loadH2C = (cb) => {
+      if (window.html2canvas) { cb(); return; }
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      s.onload = cb; document.head.appendChild(s);
+    };
+
+    loadH2C(async () => {
+      const prevScrollY = window.scrollY;
+      window.scrollTo({ top: 0, behavior: "instant" });
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const sw = el.querySelector(".bracket-scroll-wrapper");
+      const swPrev = sw ? sw.getAttribute("style") || "" : null;
+      const innerW = sw ? sw.scrollWidth : el.scrollWidth;
+
+      if (sw) {
+        sw.style.overflow  = "visible";
+        sw.style.width     = innerW + "px";
+        sw.style.minWidth  = innerW + "px";
+        sw.style.maxWidth  = "none";
+      }
+
+      const prevW = el.style.width;
+      const prevMW = el.style.minWidth;
+      el.style.width    = innerW + "px";
+      el.style.minWidth = innerW + "px";
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const r2 = el.getBoundingClientRect();
+      const H  = Math.round(el.scrollHeight);
+
+      try {
+        const canvas = await window.html2canvas(document.documentElement, {
+          scale: 2.5, useCORS: true, allowTaint: true,
+          backgroundColor: "#f8fafc", logging: false, imageTimeout: 15000,
+          x: Math.round(r2.left), y: Math.round(r2.top),
+          width: innerW, height: H, scrollX: 0, scrollY: 0,
+          windowWidth: innerW + 100,
+          windowHeight: document.documentElement.scrollHeight,
+        });
+        const link = document.createElement("a");
+        link.download = "turnuva_agaci_wc26.png";
+        link.href = canvas.toDataURL("image/png", 1.0);
+        link.click();
+      } finally {
+        el.style.width = prevW; el.style.minWidth = prevMW;
+        if (sw && swPrev !== null) sw.setAttribute("style", swPrev);
+        window.scrollTo({ top: prevScrollY, behavior: "instant" });
+      }
+    });
+  };
 
     loadHtml2Canvas(async () => {
       // Sayfayı en üste scroll et — koordinat hesabı netleşsin
