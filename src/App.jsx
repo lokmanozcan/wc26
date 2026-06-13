@@ -1230,6 +1230,8 @@ export default function App() {
   const [groupsSection, setGroupsSection] = useState("groups");
   const [activeGroupTab, setActiveGroupTab] = useState("A");
   const [selectedTeamForEncounter, setSelectedTeamForEncounter] = useState(null);
+  const [encounterRoundFilter, setEncounterRoundFilter] = useState("all"); // all | r32 | r16 | qf | sf | f
+  const [encounterPosFilter, setEncounterPosFilter] = useState("all");    // all | 1st | 2nd | 3rd
 
   const activeTeams = Object.fromEntries(
     Object.entries(INITIAL_TEAMS).map(([k,v]) => [k, { ...v, elo: customElo[k] ?? v.elo }])
@@ -1347,10 +1349,11 @@ export default function App() {
 
   // === MONTE CARLO SIMÜLASYON MOTORU ===
   function runAdvancedSimulation(teams, userScores) {
-    const SIM_COUNT = 1000;
+    const SIM_COUNT = 10000;
     const stats = {};
     const matchupStats = {};
-    // encounterStats[idA][idB] = {r32:N, r16:N, qf:N, sf:N, f:N} — toplam eşleşme sayısı
+    // encounterStats[id][oppId] = { r32, r16, qf, sf, f, total, pos1, pos2, pos3 }
+    // pos1/2/3 = bu takım grubu 1./2./3. bitirdiğinde eşleşme sayısı
     const encounterStats = {};
     const firstSimDisplayScores = {};
 
@@ -1359,18 +1362,21 @@ export default function App() {
       encounterStats[id] = {};
     });
 
-    const addEncounter = (idA, idB, round) => {
+    const addEncounter = (idA, idB, round, posA, posB) => {
       if (!idA || !idB) return;
-      if (!encounterStats[idA]) encounterStats[idA] = {};
-      if (!encounterStats[idB]) encounterStats[idB] = {};
-      if (!encounterStats[idA][idB]) encounterStats[idA][idB] = { r32:0,r16:0,qf:0,sf:0,f:0, total:0 };
-      if (!encounterStats[idB][idA]) encounterStats[idB][idA] = { r32:0,r16:0,qf:0,sf:0,f:0, total:0 };
-      encounterStats[idA][idB][round]++;
-      encounterStats[idA][idB].total++;
-      encounterStats[idB][idA][round]++;
-      encounterStats[idB][idA].total++;
+      [idA, idB].forEach((me, mi) => {
+        const opp = mi === 0 ? idB : idA;
+        const myPos = mi === 0 ? posA : posB;
+        if (!encounterStats[me]) encounterStats[me] = {};
+        if (!encounterStats[me][opp]) encounterStats[me][opp] = { r32:0,r16:0,qf:0,sf:0,f:0,total:0,pos1:0,pos2:0,pos3:0 };
+        encounterStats[me][opp][round]++;
+        encounterStats[me][opp].total++;
+        if (myPos === 1) encounterStats[me][opp].pos1++;
+        else if (myPos === 2) encounterStats[me][opp].pos2++;
+        else if (myPos === 3) encounterStats[me][opp].pos3++;
+      });
     };
-    
+
     const fixtures = generateAllFixtures();
 
     for (let sim = 0; sim < SIM_COUNT; sim++) {
@@ -1437,9 +1443,16 @@ export default function App() {
         [winners["B"],getThirdId(1)],[winners["K"],getThirdId(6)]   // M85, M87
       ];
 
+      // Her takımın bu simülasyondaki grup bitiş pozisyonu (1,2,3,4)
+      const groupPos = {};
+      Object.entries(GROUPS_CONFIG).forEach(([gName, gTeams]) => {
+        const sorted=[...gTeams].sort((a,b)=>points[b]-points[a]||gd[b]-gd[a]||gf[b]-gf[a]||teams[b].elo-teams[a].elo);
+        sorted.forEach((id,i) => { groupPos[id] = i + 1; });
+      });
+
       r32Matches.forEach(m=>{ if(m[0]&&stats[m[0]])stats[m[0]].r32++; if(m[1]&&stats[m[1]])stats[m[1]].r32++; });
-      // R32 eşleşmelerini kaydet
-      r32Matches.forEach(m=>{ addEncounter(m[0],m[1],"r32"); });
+      // R32 encounter'larını kaydet
+      r32Matches.forEach(([idA,idB])=>{ if(idA&&idB) addEncounter(idA,idB,"r32",groupPos[idA],groupPos[idB]); });
 
       const runStage=(matches,nextKey,roundKey)=>{
         const wL=[]; const loL=[];
@@ -1448,7 +1461,7 @@ export default function App() {
           const pk=[idA,idB].sort().join("_vs_");
           if(!matchupStats[pk]) matchupStats[pk]={total:0,[idA]:0,[idB]:0};
           matchupStats[pk].total++;
-          addEncounter(idA, idB, roundKey);
+          addEncounter(idA,idB,roundKey,groupPos[idA],groupPos[idB]);
           const pA=getWinProbability(teams[idA].elo,teams[idB].elo);
           if(Math.random()<pA){wL.push(idA);loL.push(idB);matchupStats[pk][idA]++;}
           else{wL.push(idB);loL.push(idA);matchupStats[pk][idB]++;}
@@ -1465,10 +1478,10 @@ export default function App() {
         const sf1A=sfM[0][0],sf1B=sfM[0][1],sf2A=sfM[1][0],sf2B=sfM[1][1];
         const w1=Math.random()<getWinProbability(teams[sf1A]?.elo??1500,teams[sf1B]?.elo??1500)?sf1A:sf1B; const l1=w1===sf1A?sf1B:sf1A;
         const w2=Math.random()<getWinProbability(teams[sf2A]?.elo??1500,teams[sf2B]?.elo??1500)?sf2A:sf2B; const l2=w2===sf2A?sf2B:sf2A;
-        addEncounter(w1,w2,"f"); // Final
+        addEncounter(w1,w2,"f",groupPos[w1],groupPos[w2]);
         const champ=Math.random()<getWinProbability(teams[w1]?.elo??1500,teams[w2]?.elo??1500)?w1:w2;
         if(stats[champ])stats[champ].champion++;
-        addEncounter(l1,l2,"f"); // 3.lük maçı (f'ye ekle)
+        addEncounter(l1,l2,"f",groupPos[l1],groupPos[l2]);
         const tpw=Math.random()<getWinProbability(teams[l1]?.elo??1500,teams[l2]?.elo??1500)?l1:l2;
         if(stats[tpw])stats[tpw].thirdPlaceChamp++;
       }
@@ -2040,42 +2053,86 @@ export default function App() {
 
               {/* 5. Olası Karşılaşmalar */}
               {simResults?.encounters && (() => {
-                const encTeamId = (selectedTeamForEncounter && gTeams.includes(selectedTeamForEncounter)) ? selectedTeamForEncounter : gTeams[0];
+                const SIM = 10000;
+                const encTeamId = (selectedTeamForEncounter && gTeams.includes(selectedTeamForEncounter))
+                  ? selectedTeamForEncounter : gTeams[0];
                 const teamEnc = simResults.encounters[encTeamId] || {};
-                const SIM = 1000;
-                const opponents = Object.entries(teamEnc)
-                  .map(([oppId, e]) => ({
-                    id: oppId,
-                    pct: (e.total / SIM) * 100,
-                    r32: (e.r32 / SIM) * 100,
-                    r16: (e.r16 / SIM) * 100,
-                    qf:  (e.qf  / SIM) * 100,
-                    sf:  (e.sf  / SIM) * 100,
-                    f:   (e.f   / SIM) * 100,
-                  }))
-                  .filter(o => o.pct >= 0.3)
-                  .sort((a, b) => b.pct - a.pct)
-                  .slice(0, 16);
 
-                const roundColors = { r32:"#64748b", r16:"#0284c7", qf:"#f59e0b", sf:"#ef4444", f:"#7c3aed" };
-                const roundLabels = { r32:"S32", r16:"S16", qf:"ÇF", sf:"YF", f:"F" };
+                // Pozisyon filtresi: bu takımın hangi pozisyonda bitirdiğinde karşılaşmayı say
+                const getFilteredCount = (e) => {
+                  if (encounterPosFilter === "1st") return e.pos1 || 0;
+                  if (encounterPosFilter === "2nd") return e.pos2 || 0;
+                  if (encounterPosFilter === "3rd") return e.pos3 || 0;
+                  // "all" — tur filtresi uygula
+                  if (encounterRoundFilter === "all") return e.total || 0;
+                  return e[encounterRoundFilter] || 0;
+                };
+                // Pozisyon bazlı toplam (normalize için)
+                const getPosTotal = () => {
+                  if (encounterPosFilter === "1st") return (simResults.teams[encTeamId]?.g1 ?? 0) / 100 * SIM;
+                  if (encounterPosFilter === "2nd") return (simResults.teams[encTeamId]?.g2 ?? 0) / 100 * SIM;
+                  if (encounterPosFilter === "3rd") return (simResults.teams[encTeamId]?.g3 ?? 0) / 100 * SIM;
+                  return SIM;
+                };
+                const denominator = Math.max(1, getPosTotal());
+
+                const opponents = Object.entries(teamEnc)
+                  .map(([oppId, e]) => {
+                    const cnt = getFilteredCount(e);
+                    return {
+                      id: oppId,
+                      pct: (cnt / denominator) * 100,
+                      r32: (e.r32 / SIM) * 100,
+                      r16: (e.r16 / SIM) * 100,
+                      qf:  (e.qf  / SIM) * 100,
+                      sf:  (e.sf  / SIM) * 100,
+                      f:   (e.f   / SIM) * 100,
+                      raw: cnt,
+                    };
+                  })
+                  .filter(o => o.pct >= 0.1)
+                  .sort((a, b) => b.pct - a.pct)
+                  .slice(0, 20);
+
                 const maxPct = opponents[0]?.pct || 1;
+                const roundColors = { r32:"#64748b", r16:"#0284c7", qf:"#f59e0b", sf:"#ef4444", f:"#7c3aed" };
+                const roundLabels = { r32:"Son 32", r16:"Son 16", qf:"Çeyrek F.", sf:"Yarı F.", f:"Final" };
+                const posFilterOptions = [["all","Tüm Pozisyonlar"],["1st","1. Bitirince"],["2nd","2. Bitirince"],["3rd","3. Bitirince"]];
+                const roundFilterOptions = [
+                  ["all","Tüm Turlar"],["r32","Son 32"],["r16","Son 16"],["qf","Çeyrek F."],["sf","Yarı F."],["f","Final"]
+                ];
+
+                const filterBtnStyle = (active, color="#0284c7") => ({
+                  padding:"4px 10px", borderRadius:6, border:"none", cursor:"pointer",
+                  fontSize:10.5, fontWeight:700, fontFamily:"monospace",
+                  background: active ? color : "#f1f5f9",
+                  color: active ? "#fff" : "#64748b",
+                  boxShadow: active ? `0 1px 6px ${color}44` : "none",
+                  transition:"all 0.13s",
+                  whiteSpace:"nowrap",
+                });
 
                 return (
-                  <div style={{...cardStyle}}>
-                    {sectionTitle("OLASI KARŞILAŞMALAR — TURNUVA BOYU","#1d4ed8")}
-                    <div style={{marginBottom:12,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>
-                      1.000× simülasyonda seçili takımın turnuva boyunca eşleştiği rakipler ve karşılaşma ihtimalleri
+                  <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
+                    {/* Başlık */}
+                    <div style={{fontSize:11,fontWeight:900,color:"#1d4ed8",letterSpacing:"0.07em",textTransform:"uppercase",borderBottom:"2px solid #eff6ff",paddingBottom:6,marginBottom:12,display:"flex",alignItems:"center",gap:7}}>
+                      <span style={{width:3,height:16,background:"#1d4ed8",borderRadius:2,display:"inline-block"}}></span>
+                      OLASI KARŞILAŞMALAR — TURNUVA BOYU
                     </div>
-                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
+                    <div style={{marginBottom:12,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>
+                      10.000× simülasyon · seçili takımın turnuva boyunca eşleştiği rakipler
+                    </div>
+
+                    {/* Takım seçici */}
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
                       {gTeams.map(id => (
                         <button key={id} onClick={()=>setSelectedTeamForEncounter(id)}
                           style={{
                             display:"flex",alignItems:"center",gap:5,padding:"5px 10px",
                             borderRadius:8,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
-                            background: encTeamId===id?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#f1f5f9",
-                            color: encTeamId===id?"#fff":"#475569",
-                            boxShadow: encTeamId===id?"0 2px 8px rgba(29,78,216,0.3)":"none",
+                            background:encTeamId===id?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#f1f5f9",
+                            color:encTeamId===id?"#fff":"#475569",
+                            boxShadow:encTeamId===id?"0 2px 8px rgba(29,78,216,0.3)":"none",
                             transition:"all 0.15s",
                           }}>
                           <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover"}} alt="" />
@@ -2083,47 +2140,95 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+
+                    {/* Pozisyon filtresi */}
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
+                      <span style={{fontSize:9.5,fontWeight:700,color:"#94a3b8",fontFamily:"monospace",marginRight:4}}>POZİSYON:</span>
+                      {posFilterOptions.map(([v,lbl])=>(
+                        <button key={v} onClick={()=>{setEncounterPosFilter(v);if(v!=="all")setEncounterRoundFilter("all");}}
+                          style={filterBtnStyle(encounterPosFilter===v,"#059669")}>{lbl}</button>
+                      ))}
+                    </div>
+
+                    {/* Tur filtresi (sadece "Tüm Pozisyonlar" seçiliyken aktif) */}
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
+                      <span style={{fontSize:9.5,fontWeight:700,color:"#94a3b8",fontFamily:"monospace",marginRight:4}}>TUR:</span>
+                      {roundFilterOptions.map(([v,lbl])=>(
+                        <button key={v}
+                          onClick={()=>{if(encounterPosFilter==="all")setEncounterRoundFilter(v);}}
+                          style={{...filterBtnStyle(encounterRoundFilter===v&&encounterPosFilter==="all","#0284c7"),
+                            opacity:encounterPosFilter!=="all"?0.4:1,
+                            cursor:encounterPosFilter!=="all"?"not-allowed":"pointer",
+                          }}>{lbl}</button>
+                      ))}
+                    </div>
+
+                    {/* Sonuç listesi */}
                     {opponents.length === 0 ? (
-                      <div style={{color:"#94a3b8",fontSize:11,fontStyle:"italic"}}>Yeterli simülasyon verisi bulunamadı.</div>
+                      <div style={{color:"#94a3b8",fontSize:11,fontStyle:"italic",padding:"10px 0"}}>Bu filtre için yeterli veri yok.</div>
                     ) : (
-                      <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                      <div style={{display:"flex",flexDirection:"column",gap:4}}>
                         {opponents.map((o, oi) => {
                           const barW = (o.pct / maxPct) * 100;
-                          const rounds = ["r32","r16","qf","sf","f"].filter(r => o[r] >= 0.5);
+                          // Hangi turlar gösterilecek: filtre "all" ise round badge'leri göster
+                          const visibleRounds = encounterPosFilter !== "all" || encounterRoundFilter !== "all"
+                            ? [] // filtre aktifken sadece % göster
+                            : ["r32","r16","qf","sf","f"].filter(r => o[r] >= 0.5);
                           return (
                             <div key={o.id} style={{
-                              display:"grid", gridTemplateColumns:"22px 1fr 80px 52px",
-                              alignItems:"center", gap:8, padding:"6px 8px", borderRadius:8,
-                              background: oi%2===0?"#f8fafc":"#ffffff", border:"1px solid #f1f5f9",
+                              display:"grid", gridTemplateColumns:"22px 1fr 90px 58px",
+                              alignItems:"center", gap:8, padding:"7px 8px", borderRadius:8,
+                              background:oi%2===0?"#f8fafc":"#ffffff", border:"1px solid #f1f5f9",
+                              transition:"background 0.1s",
                             }}>
-                              <span style={{fontSize:9.5,fontWeight:800,color:"#cbd5e1",fontFamily:"monospace",textAlign:"center"}}>{oi+1}</span>
-                              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                                <img src={getFlagUrl(INITIAL_TEAMS[o.id]?.iso)} style={{width:18,height:12,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
-                                <div>
-                                  <div style={{fontSize:11.5,fontWeight:700,color:"#0f172a",lineHeight:1.2}}>{INITIAL_TEAMS[o.id]?.name||o.id}</div>
-                                  <div style={{display:"flex",gap:3,marginTop:2,flexWrap:"wrap"}}>
-                                    {rounds.map(r=>(
-                                      <span key={r} style={{fontSize:8,fontWeight:800,fontFamily:"monospace",padding:"1px 4px",borderRadius:3,background:`${roundColors[r]}18`,color:roundColors[r]}}>
-                                        {roundLabels[r]} {o[r].toFixed(0)}%
-                                      </span>
-                                    ))}
+                              {/* Sıra */}
+                              <span style={{fontSize:10,fontWeight:800,color:"#cbd5e1",fontFamily:"monospace",textAlign:"center"}}>
+                                {oi<3?["🥇","🥈","🥉"][oi]:oi+1}
+                              </span>
+                              {/* Takım + tur badge */}
+                              <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
+                                <img src={getFlagUrl(INITIAL_TEAMS[o.id]?.iso)} style={{width:20,height:13,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
+                                <div style={{minWidth:0}}>
+                                  <div style={{fontSize:12,fontWeight:700,color:"#0f172a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                                    {INITIAL_TEAMS[o.id]?.name||o.id}
                                   </div>
+                                  {visibleRounds.length > 0 && (
+                                    <div style={{display:"flex",gap:3,marginTop:2,flexWrap:"wrap"}}>
+                                      {visibleRounds.map(r=>(
+                                        <span key={r} style={{fontSize:8,fontWeight:800,fontFamily:"monospace",padding:"1px 5px",borderRadius:3,background:`${roundColors[r]}15`,color:roundColors[r],letterSpacing:"0.03em"}}>
+                                          {roundLabels[r]} {o[r].toFixed(1)}%
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                              <div style={{height:5,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
+                              {/* Bar */}
+                              <div style={{height:6,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
                                 <div style={{
-                                  width:`${barW}%`,height:"100%",borderRadius:3,
-                                  background: o.pct>30?"linear-gradient(90deg,#ef4444,#f97316)":o.pct>15?"linear-gradient(90deg,#f59e0b,#fbbf24)":"linear-gradient(90deg,#3b82f6,#60a5fa)",
+                                  width:`${barW}%`, height:"100%", borderRadius:3,
+                                  background: o.pct>35?"linear-gradient(90deg,#ef4444,#f97316)":
+                                              o.pct>18?"linear-gradient(90deg,#f59e0b,#fbbf24)":
+                                              o.pct>8?"linear-gradient(90deg,#0284c7,#38bdf8)":
+                                              "linear-gradient(90deg,#94a3b8,#cbd5e1)",
+                                  transition:"width 0.3s",
                                 }}></div>
                               </div>
-                              <span style={{fontSize:12,fontWeight:900,fontFamily:"monospace",textAlign:"right",color:o.pct>30?"#ef4444":o.pct>15?"#f59e0b":"#3b82f6"}}>
-                                {o.pct.toFixed(1)}%
-                              </span>
+                              {/* % */}
+                              <span style={{
+                                fontSize:13,fontWeight:900,fontFamily:"monospace",textAlign:"right",
+                                color:o.pct>35?"#ef4444":o.pct>18?"#f59e0b":o.pct>8?"#0284c7":"#94a3b8",
+                              }}>{o.pct.toFixed(1)}%</span>
                             </div>
                           );
                         })}
                       </div>
                     )}
+
+                    {/* Açıklama */}
+                    <div style={{marginTop:10,padding:"8px 10px",background:"#f8fafc",borderRadius:8,fontSize:9.5,color:"#94a3b8",fontFamily:"monospace",lineHeight:1.6}}>
+                      💡 <b>Pozisyon filtresi:</b> Seçili takımın grubu 1./2./3. bitirdiği simülasyonlardaki karşılaşmalar · <b>Tur filtresi:</b> Belirli turda eşleşme ihtimali (tüm simülasyonlar üzerinden)
+                    </div>
                   </div>
                 );
               })()}
@@ -2263,144 +2368,80 @@ export default function App() {
 
         {/* === FİKSTÜR ZORLUĞU TAB === */}
         {activeTab==="difficulty" && simResults?.encounters && (() => {
-          const SIM = 1000;
+          const SIM = 10000;
           const allIds = Object.keys(INITIAL_TEAMS);
 
-          // Her takım için: eşleştiği rakiplerin ELO ağırlıklı ortalaması × karşılaşma sıklığı
-          // Zorluk = Σ(rakip_elo × karşılaşma_ihtimali) / Σ(karşılaşma_ihtimali)
           const difficultyScores = allIds.map(id => {
             const enc = simResults.encounters[id] || {};
-            let weightedElo = 0, totalWeight = 0, totalMatches = 0;
+            let weightedElo = 0, totalWeight = 0;
             Object.entries(enc).forEach(([oppId, e]) => {
-              const pct = e.total / SIM; // 0–1 arası ihtimal
+              const pct = e.total / SIM;
               const oppElo = activeTeams[oppId]?.elo || 1500;
               weightedElo += oppElo * pct;
               totalWeight += pct;
-              totalMatches += e.total;
             });
             const avgOppElo = totalWeight > 0 ? weightedElo / totalWeight : 1500;
             const t = simResults.teams[id] || {};
-            // Zorluk skoru: ağırlıklı rakip ELO'su × (ne kadar ilerlenirse o kadar ağır rakiplerle)
-            // Normalize: 1400=kolay, 2200=çok zor → 0–100 arası
-            const rawDiff = Math.max(0, Math.min(1, (avgOppElo - 1400) / 800));
-            // Ayrıca turnuvada ilerleme bonusu (QF'e çıkma ihtimali yüksekse daha fazla maç = daha zor)
-            const progressBonus = ((t.r16||0) + (t.qf||0)*1.5 + (t.sf||0)*2 + (t.f||0)*2.5) / (4*100);
-            const finalScore = Math.min(100, rawDiff * 70 + progressBonus * 30);
-            return {
-              id,
-              score: finalScore,
-              avgOppElo: Math.round(avgOppElo),
-              totalMatches,
-              advanceR16: t.r16 || 0,
-              advanceQF:  t.qf  || 0,
-              advanceSF:  t.sf  || 0,
-              advanceF:   t.f   || 0,
-              champion:   t.champion || 0,
-            };
-          }).sort((a, b) => b.score - a.score);
+            const rawDiff = Math.max(0, Math.min(1, (avgOppElo - 1350) / 850));
+            const progressBonus = ((t.r16||0)*0.5 + (t.qf||0)*1.2 + (t.sf||0)*2 + (t.f||0)*2.5) / (4*100);
+            const finalScore = Math.min(100, rawDiff * 72 + progressBonus * 28);
+            return { id, score:finalScore, avgOppElo:Math.round(avgOppElo),
+              r16:t.r16||0, qf:t.qf||0, sf:t.sf||0, f:t.f||0, champion:t.champion||0 };
+          }).sort((a,b)=>b.score-a.score);
 
-          const maxScore = difficultyScores[0]?.score || 1;
-          const minScore = difficultyScores[difficultyScores.length-1]?.score || 0;
-
-          const getDiffColor = (score) => {
-            if (score >= 70) return "#ef4444";
-            if (score >= 55) return "#f97316";
-            if (score >= 40) return "#f59e0b";
-            if (score >= 25) return "#3b82f6";
-            return "#10b981";
-          };
-          const getDiffLabel = (score) => {
-            if (score >= 70) return "ÇOK ZOR";
-            if (score >= 55) return "ZOR";
-            if (score >= 40) return "ORTA";
-            if (score >= 25) return "KOLAY";
-            return "ÇOK KOLAY";
-          };
+          const getDiffColor = s => s>=72?"#ef4444":s>=56?"#f97316":s>=40?"#f59e0b":s>=24?"#3b82f6":"#10b981";
+          const getDiffLabel = s => s>=72?"ÇOK ZOR":s>=56?"ZOR":s>=40?"ORTA":s>=24?"KOLAY":"ÇOK KOLAY";
 
           return (
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              {/* Başlık kart */}
-              <div style={{background:"linear-gradient(135deg,#0f172a,#1e293b)",borderRadius:14,padding:"16px 20px",border:"1px solid rgba(245,158,11,0.2)",boxShadow:"0 4px 20px rgba(0,0,0,0.1)"}}>
+              <div style={{background:"linear-gradient(135deg,#0f172a,#1e293b)",borderRadius:14,padding:"16px 20px",border:"1px solid rgba(245,158,11,0.2)"}}>
                 <div style={{fontSize:14,fontWeight:900,color:"#f59e0b",letterSpacing:"0.05em",marginBottom:4}}>🎯 FİKSTÜR ZORLUĞU ANALİZİ</div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",fontFamily:"monospace"}}>
-                  1.000× Monte Carlo simülasyonunda her takımın turnuva boyunca karşılaştığı rakiplerin ELO ağırlıklı ortalaması ve ilerleme bonusu baz alınarak hesaplandı.
-                  <br/>Zorluk skoru 0–100 arası: rakip ELO'su (70%) + ilerleme derinliği bonusu (30%)
+                <div style={{fontSize:10.5,color:"rgba(255,255,255,0.5)",fontFamily:"monospace"}}>
+                  10.000× simülasyon · Turnuva boyunca karşılaşılan rakiplerin ağırlıklı ort. ELO'su + ilerleme derinliği baz alınarak hesaplandı
                 </div>
               </div>
-
-              <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
+              <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
                 <table style={{width:"100%",borderCollapse:"collapse"}}>
                   <thead>
                     <tr style={{background:"#f8fafc",borderBottom:"2px solid #e2e8f0"}}>
-                      {["#","TAKIM","ELO","ORT. RAKİP ELO","FİKSTÜR ZORLUĞU","ZORLUK SKORU","S16","ÇF","YF","F","ŞAMPİYON"].map((h,hi)=>(
-                        <th key={hi} style={{
-                          padding:"10px 8px",fontSize:9,fontWeight:800,color:"#94a3b8",
-                          textAlign:hi<=1?"left":"center",letterSpacing:"0.05em",
-                          fontFamily:"monospace",whiteSpace:"nowrap",
-                        }}>{h}</th>
+                      {["#","TAKIM","KEND. ELO","ORT. RAKİP ELO","FİKSTÜR ZORLUĞU","SKOR","S16","ÇF","YF","F","ŞAMPİYON"].map((h,hi)=>(
+                        <th key={hi} style={{padding:"10px 8px",fontSize:9,fontWeight:800,color:"#94a3b8",textAlign:hi<=1?"left":"center",letterSpacing:"0.05em",fontFamily:"monospace",whiteSpace:"nowrap"}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {difficultyScores.map((item, idx) => {
-                      const team = INITIAL_TEAMS[item.id];
-                      const myElo = activeTeams[item.id]?.elo || 1500;
-                      const color = getDiffColor(item.score);
-                      const label = getDiffLabel(item.score);
-                      const barPct = (item.score / 100) * 100;
-                      const isTop10 = idx < 10;
+                    {difficultyScores.map((item,idx)=>{
+                      const team=INITIAL_TEAMS[item.id]; const myElo=activeTeams[item.id]?.elo||1500;
+                      const color=getDiffColor(item.score); const label=getDiffLabel(item.score);
                       return (
-                        <tr key={item.id} style={{
-                          borderBottom:"1px solid #f1f5f9",
-                          background: idx%2===0?"#ffffff":"#fafbfc",
-                          borderLeft:`3px solid ${idx<3?color:"transparent"}`,
-                        }}>
-                          {/* # */}
-                          <td style={{padding:"8px 8px",fontSize:11,fontWeight:800,color: idx<3?color:"#cbd5e1",fontFamily:"monospace",textAlign:"center",width:28}}>
+                        <tr key={item.id} style={{borderBottom:"1px solid #f1f5f9",background:idx%2===0?"#fff":"#fafbfc",borderLeft:`3px solid ${idx<3?color:"transparent"}`}}>
+                          <td style={{padding:"8px 8px",fontSize:11,fontWeight:800,color:idx<3?color:"#cbd5e1",fontFamily:"monospace",textAlign:"center",width:30}}>
                             {idx===0?"🔴":idx===1?"🟠":idx===2?"🟡":idx+1}
                           </td>
-                          {/* Takım */}
                           <td style={{padding:"8px 10px",minWidth:130}}>
                             <div style={{display:"flex",alignItems:"center",gap:7}}>
                               <img src={getFlagUrl(team?.iso)} style={{width:20,height:14,borderRadius:2,objectFit:"cover",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}} alt="" />
                               <span style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>{team?.name}</span>
                             </div>
                           </td>
-                          {/* Kendi ELO */}
+                          <td style={{padding:"8px 6px",textAlign:"center"}}><span style={{fontSize:11,fontWeight:700,fontFamily:"monospace",color:"#0284c7"}}>{myElo}</span></td>
                           <td style={{padding:"8px 6px",textAlign:"center"}}>
-                            <span style={{fontSize:11,fontWeight:700,fontFamily:"monospace",color:"#0284c7"}}>{myElo}</span>
+                            <span style={{fontSize:11,fontWeight:700,fontFamily:"monospace",color:item.avgOppElo>1900?"#ef4444":item.avgOppElo>1750?"#f59e0b":"#10b981"}}>{item.avgOppElo}</span>
                           </td>
-                          {/* Ort. Rakip ELO */}
-                          <td style={{padding:"8px 6px",textAlign:"center"}}>
-                            <span style={{
-                              fontSize:11,fontWeight:700,fontFamily:"monospace",
-                              color: item.avgOppElo > 1900 ? "#ef4444" : item.avgOppElo > 1750 ? "#f59e0b" : "#10b981",
-                            }}>{item.avgOppElo}</span>
-                          </td>
-                          {/* Bar */}
-                          <td style={{padding:"8px 10px",minWidth:120}}>
-                            <div style={{height:7,background:"#f1f5f9",borderRadius:4,overflow:"hidden",width:"100%"}}>
-                              <div style={{
-                                width:`${barPct}%`,height:"100%",borderRadius:4,
-                                background:`linear-gradient(90deg,${color}88,${color})`,
-                                transition:"width 0.4s",
-                              }}></div>
+                          <td style={{padding:"8px 10px",minWidth:130}}>
+                            <div style={{height:7,background:"#f1f5f9",borderRadius:4,overflow:"hidden"}}>
+                              <div style={{width:`${item.score}%`,height:"100%",borderRadius:4,background:`linear-gradient(90deg,${color}88,${color})`}}></div>
                             </div>
                           </td>
-                          {/* Zorluk Skoru + Etiket */}
-                          <td style={{padding:"8px 8px",textAlign:"center",whiteSpace:"nowrap"}}>
+                          <td style={{padding:"8px 8px",textAlign:"center"}}>
                             <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
                               <span style={{fontSize:13,fontWeight:900,fontFamily:"monospace",color}}>{item.score.toFixed(1)}</span>
                               <span style={{fontSize:8,fontWeight:800,padding:"1px 5px",borderRadius:3,background:`${color}18`,color,letterSpacing:"0.05em"}}>{label}</span>
                             </div>
                           </td>
-                          {/* İlerleme yüzdeleri */}
-                          {[item.advanceR16, item.advanceQF, item.advanceSF, item.advanceF, item.champion].map((v,vi)=>(
+                          {[item.r16,item.qf,item.sf,item.f,item.champion].map((v,vi)=>(
                             <td key={vi} style={{padding:"8px 4px",textAlign:"center"}}>
-                              <span style={{
-                                fontSize:10.5,fontWeight: v>20?800:600,fontFamily:"monospace",
-                                color: v>40?"#ef4444":v>20?"#f59e0b":v>5?"#0284c7":"#cbd5e1",
-                              }}>{v.toFixed(1)}%</span>
+                              <span style={{fontSize:10.5,fontWeight:v>20?800:600,fontFamily:"monospace",color:v>40?"#ef4444":v>20?"#f59e0b":v>5?"#0284c7":"#cbd5e1"}}>{v.toFixed(1)}%</span>
                             </td>
                           ))}
                         </tr>
@@ -2409,17 +2450,13 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
-
-              {/* Renk açıklaması */}
-              <div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"#ffffff",borderRadius:10,border:"1px solid #e2e8f0"}}>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"#fff",borderRadius:10,border:"1px solid #e2e8f0"}}>
                 {[["ÇOK ZOR","#ef4444"],["ZOR","#f97316"],["ORTA","#f59e0b"],["KOLAY","#3b82f6"],["ÇOK KOLAY","#10b981"]].map(([lbl,clr])=>(
                   <div key={lbl} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,fontWeight:700,color:"#475569"}}>
                     <span style={{width:10,height:10,borderRadius:2,background:clr,display:"inline-block"}}></span>{lbl}
                   </div>
                 ))}
-                <div style={{marginLeft:"auto",fontSize:9,color:"#94a3b8",fontFamily:"monospace",alignSelf:"center"}}>
-                  * ELO bazlı hesaplama — 1.000× simülasyon
-                </div>
+                <div style={{marginLeft:"auto",fontSize:9,color:"#94a3b8",fontFamily:"monospace",alignSelf:"center"}}>* ELO bazlı · 10.000× simülasyon</div>
               </div>
             </div>
           );
