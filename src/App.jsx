@@ -878,22 +878,21 @@ export default function App() {
 
     // --- Layout ---
     const CARD_W    = 130;
-    const CARD_H    = 52;  // 2 satır (her biri 24px) + 4px padding
+    const CARD_H    = 52;
     const ROW_H     = 24;
     const COL_GAP   = 18;
     const PAD       = 20;
-    const CENTER_W  = 200;
-    const COLS      = 4; // her yanda 4 sütun: r32, r16, qf, sf
+    const CENTER_W  = 240;  // daha geniş — finalist isimleri sığsın
+    const COLS      = 4;
     const SIDE_W    = COLS * CARD_W + (COLS - 1) * COL_GAP;
     const TOTAL_W   = PAD * 2 + SIDE_W * 2 + COL_GAP * 2 + CENTER_W;
 
-    // Her sütundaki maç sayısı: r32=8, r16=4, qf=2, sf=1
-    const MATCHES_PER_COL = [8, 4, 2, 1];
-    const HEADER_H  = 36;
+    const HEADER_H   = 36;
+    const COL_LABEL_H = 22;
     const MAX_MATCHES = 8;
-    const BRACKET_H = MAX_MATCHES * CARD_H + (MAX_MATCHES - 1) * 6; // 6px gap
-    // Üçüncülük maçı artık aşağıda değil, merkez sütunda Final kutusunun altında
-    const TOTAL_H   = PAD + HEADER_H + 22 + BRACKET_H + PAD;
+    const BRACKET_H  = MAX_MATCHES * CARD_H + (MAX_MATCHES - 1) * 6;
+    // Üçüncülük artık aşağıda değil, merkez sütunda → TOTAL_H sadece bracket
+    const TOTAL_H    = PAD + HEADER_H + COL_LABEL_H + BRACKET_H + PAD;
 
     const canvas = document.createElement("canvas");
     canvas.width  = TOTAL_W * DPR;
@@ -928,7 +927,7 @@ export default function App() {
       ctx.fillText(colLabels[COLS - 1 - ci], rightColX(ci), COL_LABEL_Y);
     });
 
-    const BRACKET_TOP = PAD + HEADER_H + 22;
+    const BRACKET_TOP = PAD + HEADER_H + COL_LABEL_H;
 
     // Maç kartı çizici
     const drawMatchCard = (m, x, y, knockoutScores) => {
@@ -1086,199 +1085,238 @@ export default function App() {
       });
     });
 
-    // ── MERKEZ: FİNAL + ÜÇÜNCÜLÜK BLOĞU ──
-    const CX = PAD + SIDE_W + COL_GAP;
+    // ── MERKEZ: FİNAL + ÜÇÜNCÜLÜK ──────────────────────────────────────────────
+    const CX      = PAD + SIDE_W + COL_GAP;
+    const lsfX    = PAD + SIDE_W;
+    const rsfX    = PAD + SIDE_W + COL_GAP * 2 + CENTER_W;
+    const sfMidY  = getMatchY(0, 1) + CARD_H / 2;
 
-    // Final kutusunun boyutları (web UI'daki gibi)
-    const finalHeaderH  = 22;
-    const finalistRowH  = 26;
-    const barH          = 9;   // progress bar + üst/alt margin
-    const champBlockH   = 38;
-    const finalPadV     = 10;  // iç üst+alt padding
-    const finalInnerH   = finalistRowH * 2 + barH + champBlockH + finalPadV + 8; // +8 marginTop champ
-    const finalBlockH   = finalHeaderH + finalInnerH;
+    // ── boyutlar (web UI'daki spacing'e sadık) ──
+    const F_HDR   = 28;   // Final başlık şeridi
+    const F_ROW   = 30;   // finalist satır yüksekliği
+    const F_BAR   = 11;   // progress bar alanı (üst+bar+alt)
+    const F_GAP   = 6;    // finalist satırları arası
+    const F_CHAMP = 42;   // şampiyon kutu
+    const F_PAD   = 10;   // iç üst/alt padding
+    const finalBlockH = F_HDR + F_PAD + F_ROW + F_GAP + F_BAR + F_ROW + F_PAD + 6 + F_CHAMP + F_PAD;
 
-    // Üçüncülük bloğunun boyutları
-    const thirdHeaderH  = 18;
-    const thirdRowH     = 22;
-    const thirdPadV     = 8;
-    const thirdBlockH   = thirdHeaderH + thirdRowH * 2 + thirdPadV + 4; // 4 = gap between rows
+    const T_HDR   = 22;   // Üçüncülük başlık şeridi
+    const T_ROW   = 28;   // üçüncülük satır yüksekliği
+    const T_GAP   = 4;    // satırlar arası
+    const T_PAD   = 8;    // iç üst/alt padding
+    const thirdBlockH = T_HDR + T_PAD + T_ROW + T_GAP + T_ROW + T_PAD;
 
-    const centerTotalH  = finalBlockH + 6 + thirdBlockH; // 6px gap aralarında
+    const BETWEEN = 8;    // Final ile Üçüncülük arası boşluk
+    const centerTotalH = finalBlockH + BETWEEN + thirdBlockH;
+    const centerMidY   = sfMidY;                       // bracket dikey orta
+    const finalY       = centerMidY - centerTotalH / 2;
+    const thirdY       = finalY + finalBlockH + BETWEEN;
 
-    // Merkez blok dikeyde ortalı
-    const sfLY = getMatchY(0, 1) + CARD_H / 2;
-    const sfRY = getMatchY(0, 1) + CARD_H / 2;
-    const centerMidY = (sfLY + sfRY) / 2;
-    const centerStartY = centerMidY - centerTotalH / 2;
-    const finalY = centerStartY;
-
-    // Sol SF → Final bağlantısı
+    // SF bağlantı çizgileri (altın)
     ctx.strokeStyle = "#f59e0b";
-    ctx.lineWidth = 1.5;
-    const lsfX = PAD + SIDE_W;
-    const rsfX = PAD + SIDE_W + COL_GAP * 2 + CENTER_W;
-    ctx.beginPath();
-    ctx.moveTo(lsfX + CARD_W, sfLY);
-    ctx.lineTo(CX, sfLY);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(rsfX, sfRY);
-    ctx.lineTo(CX + CENTER_W, sfRY);
-    ctx.stroke();
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath(); ctx.moveTo(lsfX + CARD_W, sfMidY); ctx.lineTo(CX, sfMidY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rsfX, sfMidY); ctx.lineTo(CX + CENTER_W, sfMidY); ctx.stroke();
 
-    // ── FİNAL KUTUSU ──
-    ctx.fillStyle = "#0a0f1e";
-    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 12);
+    // ── FİNAL KUTUSU ──────────────────────────────────────────────────────────
+    // dış glow efekti (ince shadow simülasyonu)
+    ctx.shadowColor   = "rgba(245,158,11,0.25)";
+    ctx.shadowBlur    = 18;
+    ctx.fillStyle     = "#0a0f1e";
+    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 14);
     ctx.fill();
-    ctx.strokeStyle = "rgba(245,158,11,0.35)";
-    ctx.lineWidth = 1;
-    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 12);
+    ctx.shadowBlur    = 0;
+
+    ctx.strokeStyle   = "rgba(245,158,11,0.35)";
+    ctx.lineWidth     = 1;
+    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 14);
     ctx.stroke();
 
-    // Final başlık şeridi (gradient)
-    const grad = ctx.createLinearGradient(CX, 0, CX + CENTER_W, 0);
-    grad.addColorStop(0, "#d97706"); grad.addColorStop(1, "#f59e0b");
-    ctx.fillStyle = grad;
-    roundRect(ctx, CX, finalY, CENTER_W, finalHeaderH, 12);
+    // Başlık gradient şerit
+    const hGrad = ctx.createLinearGradient(CX, 0, CX + CENTER_W, 0);
+    hGrad.addColorStop(0, "#b45309");
+    hGrad.addColorStop(0.5, "#f59e0b");
+    hGrad.addColorStop(1, "#b45309");
+    ctx.fillStyle = hGrad;
+    roundRect(ctx, CX, finalY, CENTER_W, F_HDR, 14);
     ctx.fill();
-    ctx.fillRect(CX, finalY + finalHeaderH - 8, CENTER_W, 8);
+    ctx.fillRect(CX, finalY + F_HDR - 8, CENTER_W, 8); // alt köşeleri düzelt
 
-    ctx.font = "900 8.5px system-ui,sans-serif";
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("★  FİNAL  ★", CX + CENTER_W / 2, finalY + finalHeaderH / 2);
+    ctx.font          = "900 10px system-ui,sans-serif";
+    ctx.fillStyle     = "#ffffff";
+    ctx.textAlign     = "center";
+    ctx.textBaseline  = "middle";
+    ctx.fillText("★  FİNAL  ★", CX + CENTER_W / 2, finalY + F_HDR / 2);
 
-    // Finalistler
-    const innerTop = finalY + finalHeaderH + finalPadV / 2;
+    // finalist satırları
+    let curY = finalY + F_HDR + F_PAD;
     [[bracket.finalMatch.idA, bracket.finalMatch.pA, bracket.finalMatch.winner === bracket.finalMatch.idA],
      [bracket.finalMatch.idB, bracket.finalMatch.pB, bracket.finalMatch.winner === bracket.finalMatch.idB]
     ].forEach(([id, pct, isWin], ri) => {
-      const fy  = innerTop + ri * (finalistRowH + (ri === 0 ? barH : 0));
-      const midY = fy + finalistRowH / 2;
+      const ry   = curY;
+      const midY = ry + F_ROW / 2;
 
-      // Satır arka planı
-      ctx.fillStyle = isWin ? "rgba(245,158,11,0.18)" : "rgba(255,255,255,0.05)";
-      roundRect(ctx, CX + 6, fy, CENTER_W - 12, finalistRowH, 6);
+      // satır arka plan
+      ctx.fillStyle = isWin ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.04)";
+      roundRect(ctx, CX + 8, ry, CENTER_W - 16, F_ROW, 7);
       ctx.fill();
-      ctx.strokeStyle = isWin ? "rgba(245,158,11,0.4)" : "rgba(255,255,255,0.08)";
-      ctx.lineWidth = 1;
-      roundRect(ctx, CX + 6, fy, CENTER_W - 12, finalistRowH, 6);
+      ctx.strokeStyle = isWin ? "rgba(245,158,11,0.45)" : "rgba(255,255,255,0.07)";
+      ctx.lineWidth   = 1;
+      roundRect(ctx, CX + 8, ry, CENTER_W - 16, F_ROW, 7);
       ctx.stroke();
 
-      // Bayrak
-      const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
-      if (flag) ctx.drawImage(flag, CX + 12, midY - 6, 18, 12);
+      // sol accent şerit (kazanana)
+      if (isWin) {
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(CX + 8, ry + 4, 3, F_ROW - 8);
+      }
 
-      // Ad
+      // bayrak
+      const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
+      if (flag) ctx.drawImage(flag, CX + 16, midY - 7, 20, 14);
+
+      // isim
       ctx.save();
-      ctx.beginPath(); ctx.rect(CX + 34, fy, CENTER_W - 34 - 28, finalistRowH); ctx.clip();
-      ctx.font = isWin ? "800 11px system-ui" : "600 11px system-ui";
-      ctx.fillStyle = isWin ? "#fbbf24" : "rgba(255,255,255,0.7)";
-      ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 34, midY);
+      ctx.beginPath(); ctx.rect(CX + 40, ry, CENTER_W - 40 - 36, F_ROW); ctx.clip();
+      ctx.font         = isWin ? "800 12px system-ui" : "500 12px system-ui";
+      ctx.fillStyle    = isWin ? "#fbbf24" : "rgba(255,255,255,0.75)";
+      ctx.textAlign    = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 40, midY);
       ctx.restore();
 
-      // Yüzde
-      ctx.font = "800 9.5px monospace";
-      ctx.fillStyle = isWin ? "#fbbf24" : "rgba(255,255,255,0.4)";
-      ctx.textAlign = "right"; ctx.textBaseline = "middle";
-      ctx.fillText(`${pct}%`, CX + CENTER_W - 8, midY);
+      // yüzde
+      ctx.font         = "800 11px monospace";
+      ctx.fillStyle    = isWin ? "#fbbf24" : "rgba(255,255,255,0.38)";
+      ctx.textAlign    = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`${pct}%`, CX + CENTER_W - 10, midY);
 
-      // Progress bar (ilk satırdan sonra)
+      curY += F_ROW + (ri === 0 ? F_GAP : 0);
+
+      // progress bar (ilk satırdan sonra)
       if (ri === 0) {
-        const barY = fy + finalistRowH + 2;
-        ctx.fillStyle = "rgba(255,255,255,0.06)";
-        roundRect(ctx, CX + 6, barY, CENTER_W - 12, 5, 2); ctx.fill();
+        const barY = curY;
+        const barW = CENTER_W - 16;
+        // track
+        ctx.fillStyle = "rgba(255,255,255,0.07)";
+        roundRect(ctx, CX + 8, barY, barW, 5, 2.5); ctx.fill();
+        // A tarafı (yeşil)
         ctx.fillStyle = "#10b981";
-        roundRect(ctx, CX + 6, barY, (CENTER_W - 12) * bracket.finalMatch.pA / 100, 5, 2); ctx.fill();
+        roundRect(ctx, CX + 8, barY, barW * bracket.finalMatch.pA / 100, 5, 2.5); ctx.fill();
+        // B tarafı (mavi)
+        const bStart = CX + 8 + barW * bracket.finalMatch.pA / 100;
         ctx.fillStyle = "#3b82f6";
-        const barStartB = CX + 6 + (CENTER_W - 12) * bracket.finalMatch.pA / 100;
-        const barWB = (CENTER_W - 12) * bracket.finalMatch.pB / 100;
-        roundRect(ctx, barStartB, barY, barWB, 5, 2); ctx.fill();
+        roundRect(ctx, bStart, barY, barW * bracket.finalMatch.pB / 100, 5, 2.5); ctx.fill();
+        curY += F_BAR;
       }
     });
 
-    // Şampiyon bloğu
-    const champY = innerTop + finalistRowH * 2 + barH + 6;
-    ctx.fillStyle = "rgba(217,119,6,0.18)";
-    roundRect(ctx, CX + 6, champY, CENTER_W - 12, champBlockH, 8); ctx.fill();
-    ctx.strokeStyle = "rgba(245,158,11,0.4)"; ctx.lineWidth = 1;
-    roundRect(ctx, CX + 6, champY, CENTER_W - 12, champBlockH, 8); ctx.stroke();
+    // şampiyon kutu
+    curY += F_PAD;
+    const champY = curY;
+    const champGrad = ctx.createLinearGradient(CX, champY, CX, champY + F_CHAMP);
+    champGrad.addColorStop(0, "rgba(217,119,6,0.22)");
+    champGrad.addColorStop(1, "rgba(251,191,36,0.10)");
+    ctx.fillStyle = champGrad;
+    roundRect(ctx, CX + 8, champY, CENTER_W - 16, F_CHAMP, 10); ctx.fill();
+    ctx.strokeStyle = "rgba(245,158,11,0.45)"; ctx.lineWidth = 1;
+    roundRect(ctx, CX + 8, champY, CENTER_W - 16, F_CHAMP, 10); ctx.stroke();
 
-    ctx.font = "900 7.5px monospace";
-    ctx.fillStyle = "rgba(251,191,36,0.7)";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("DÜNYA ŞAMPİYONU", CX + CENTER_W / 2, champY + 10);
+    // "DÜNYA ŞAMPİYONU" label
+    ctx.font         = "700 8px monospace";
+    ctx.fillStyle    = "rgba(251,191,36,0.65)";
+    ctx.textAlign    = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("DÜNYA ŞAMPİYONU", CX + CENTER_W / 2, champY + 11);
 
-    const wId = bracket.finalMatch.winner;
-    const wFlag = flagCache.current[INITIAL_TEAMS[wId]?.iso?.toLowerCase()];
-    const wName = INITIAL_TEAMS[wId]?.name || "---";
-    const champMidY = champY + champBlockH - 13;
-    if (wFlag) ctx.drawImage(wFlag, CX + CENTER_W / 2 - 44, champMidY - 7, 22, 15);
-    ctx.font = "900 12px system-ui";
-    ctx.fillStyle = "#fbbf24";
-    ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    ctx.fillText(wName, CX + CENTER_W / 2 - 18, champMidY);
+    // kupa ikonu + bayrak + isim
+    const wId    = bracket.finalMatch.winner;
+    const wFlag  = flagCache.current[INITIAL_TEAMS[wId]?.iso?.toLowerCase()];
+    const wName  = INITIAL_TEAMS[wId]?.name || "---";
+    const wLineY = champY + F_CHAMP - 14;
 
-    // ── ÜÇÜNCÜLÜK MAÇI — Final kutusunun hemen altında ──
-    const thirdY = finalY + finalBlockH + 6;
+    // kupa emoji yerine altın yıldız
+    ctx.font      = "bold 13px system-ui";
+    ctx.fillStyle = "#f59e0b";
+    ctx.textAlign = "right";
+    ctx.fillText("🏆", CX + CENTER_W / 2 - 28, wLineY);
 
-    // Üçüncülük başlık şeridi (mor gradient)
+    if (wFlag) ctx.drawImage(wFlag, CX + CENTER_W / 2 - 22, wLineY - 8, 24, 17);
+    ctx.font         = "900 13px system-ui";
+    ctx.fillStyle    = "#fbbf24";
+    ctx.textAlign    = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(wName, CX + CENTER_W / 2 + 6, wLineY);
+
+    // ── ÜÇÜNCÜLÜK MAÇI ────────────────────────────────────────────────────────
+    // dış çerçeve (tüm blok)
+    ctx.shadowColor = "rgba(124,58,237,0.18)";
+    ctx.shadowBlur  = 12;
     const thirdGrad = ctx.createLinearGradient(CX, 0, CX + CENTER_W, 0);
-    thirdGrad.addColorStop(0, "#7c3aed"); thirdGrad.addColorStop(1, "#a855f7");
+    thirdGrad.addColorStop(0, "#6d28d9");
+    thirdGrad.addColorStop(0.5, "#a855f7");
+    thirdGrad.addColorStop(1, "#6d28d9");
     ctx.fillStyle = thirdGrad;
-    roundRect(ctx, CX, thirdY, CENTER_W, thirdHeaderH, 8); ctx.fill();
+    roundRect(ctx, CX, thirdY, CENTER_W, T_HDR, 10); ctx.fill();
+    ctx.shadowBlur = 0;
 
-    ctx.font = "900 8px system-ui";
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("★  ÜÇÜNCÜLÜK MAÇI  ★", CX + CENTER_W / 2, thirdY + thirdHeaderH / 2);
+    ctx.font         = "900 8.5px system-ui";
+    ctx.fillStyle    = "#ffffff";
+    ctx.textAlign    = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("★  ÜÇÜNCÜLÜK MAÇI  ★", CX + CENTER_W / 2, thirdY + T_HDR / 2);
 
-    // Üçüncülük kutu arka planı
-    ctx.fillStyle = "#ffffff";
-    roundRect(ctx, CX, thirdY + thirdHeaderH, CENTER_W, thirdRowH * 2 + thirdPadV + 4, 8);
+    // Üçüncülük takım satırları (beyaz kart)
+    const tCardY = thirdY + T_HDR;
+    ctx.fillStyle   = "#ffffff";
+    roundRect(ctx, CX, tCardY, CENTER_W, T_PAD + T_ROW + T_GAP + T_ROW + T_PAD, 10);
     ctx.fill();
     ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 1;
-    roundRect(ctx, CX, thirdY + thirdHeaderH, CENTER_W, thirdRowH * 2 + thirdPadV + 4, 8);
+    roundRect(ctx, CX, tCardY, CENTER_W, T_PAD + T_ROW + T_GAP + T_ROW + T_PAD, 10);
     ctx.stroke();
 
     [[bracket.thirdPlaceMatch.idA, bracket.thirdPlaceMatch.pA, bracket.thirdPlaceMatch.winner === bracket.thirdPlaceMatch.idA],
      [bracket.thirdPlaceMatch.idB, bracket.thirdPlaceMatch.pB, bracket.thirdPlaceMatch.winner === bracket.thirdPlaceMatch.idB]
     ].forEach(([id, pct, isWin], ri) => {
-      const ry = thirdY + thirdHeaderH + thirdPadV / 2 + ri * (thirdRowH + 3);
-      const midY = ry + thirdRowH / 2;
+      const ry   = tCardY + T_PAD + ri * (T_ROW + T_GAP);
+      const midY = ry + T_ROW / 2;
 
       if (isWin) {
-        ctx.fillStyle = "rgba(124,58,237,0.07)";
-        roundRect(ctx, CX + 6, ry, CENTER_W - 12, thirdRowH, 6);
-        ctx.fill();
+        ctx.fillStyle = "rgba(124,58,237,0.08)";
+        roundRect(ctx, CX + 8, ry, CENTER_W - 16, T_ROW, 6); ctx.fill();
+        ctx.strokeStyle = "rgba(124,58,237,0.25)"; ctx.lineWidth = 1;
+        roundRect(ctx, CX + 8, ry, CENTER_W - 16, T_ROW, 6); ctx.stroke();
+        // sol accent
+        ctx.fillStyle = "#7c3aed";
+        ctx.fillRect(CX + 8, ry + 4, 3, T_ROW - 8);
       }
 
       const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
-      if (flag) ctx.drawImage(flag, CX + 10, midY - 6, 18, 12);
+      if (flag) ctx.drawImage(flag, CX + 16, midY - 7, 20, 14);
 
       ctx.save();
-      ctx.beginPath(); ctx.rect(CX + 32, ry, CENTER_W - 32 - 28, thirdRowH); ctx.clip();
-      ctx.font = isWin ? "700 11px system-ui" : "500 11px system-ui";
-      ctx.fillStyle = isWin ? "#5b21b6" : "#374151";
-      ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 32, midY);
+      ctx.beginPath(); ctx.rect(CX + 40, ry, CENTER_W - 40 - 36, T_ROW); ctx.clip();
+      ctx.font         = isWin ? "700 12px system-ui" : "500 12px system-ui";
+      ctx.fillStyle    = isWin ? "#5b21b6" : "#374151";
+      ctx.textAlign    = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 40, midY);
       ctx.restore();
 
       if (isWin) {
-        // Yıldız ikonu
+        ctx.font = "bold 11px system-ui";
         ctx.fillStyle = "#7c3aed";
-        ctx.font = "bold 10px system-ui";
-        ctx.textAlign = "right"; ctx.textBaseline = "middle";
-        ctx.fillText("★", CX + CENTER_W - 30, midY);
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText("★", CX + CENTER_W - 28, midY);
       }
 
-      ctx.font = "700 10px monospace";
-      ctx.fillStyle = isWin ? "#7c3aed" : "#94a3b8";
-      ctx.textAlign = "right"; ctx.textBaseline = "middle";
-      ctx.fillText(`${pct}%`, CX + CENTER_W - 8, midY);
+      ctx.font         = "700 10.5px monospace";
+      ctx.fillStyle    = isWin ? "#7c3aed" : "#94a3b8";
+      ctx.textAlign    = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`${pct}%`, CX + CENTER_W - 10, midY);
     });
 
     // İndir
