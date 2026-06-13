@@ -611,8 +611,7 @@ export default function App() {
   const groupsPanelRef = useRef(null);
   const bracketPanelRef = useRef(null);
 
-  // ── Görsel indirme yardımcısı ──────────────────────────────────────────────
-  // html2canvas'ı yükler ve callback çalıştırır
+  // ── Görsel indirme — clone yöntemi (scroll bağımsız, piksel mükemmel) ──────
   const loadHtml2Canvas = (cb) => {
     if (window.html2canvas) { cb(); return; }
     const s = document.createElement("script");
@@ -621,52 +620,58 @@ export default function App() {
     document.head.appendChild(s);
   };
 
-  // Bir elementi TAMAMEN (scroll dahil) yakalar
-  const captureElement = async (el, extraOpts = {}) => {
-    // 1) Mevcut scroll pozisyonunu koru
-    const bodyScrollY = window.scrollY;
-    const bodyScrollX = window.scrollX;
-
-    // 2) Elementin sayfa üzerindeki GERÇEK konumu
-    const rect = el.getBoundingClientRect();
-    const absTop  = rect.top  + bodyScrollY;
-    const absLeft = rect.left + bodyScrollX;
-
-    // 3) Tam scroll boyutları (içerik kırpılmasın)
-    const fullW = el.scrollWidth;
-    const fullH = el.scrollHeight;
-
-    const opts = {
-      scale: 3,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      imageTimeout: 0,
-      // Hangi alanı çizeceğimizi kesin belirt
-      x: absLeft,
-      y: absTop,
-      width: fullW,
-      height: fullH,
-      scrollX: -bodyScrollX,
-      scrollY: -bodyScrollY,
-      windowWidth:  document.documentElement.scrollWidth,
-      windowHeight: document.documentElement.scrollHeight,
-      ...extraOpts,
-    };
-
-    return await window.html2canvas(el, opts);
-  };
-
   const downloadAsImage = (ref, filename) => {
     if (!ref.current) return;
     const el = ref.current;
+
     loadHtml2Canvas(async () => {
-      const canvas = await captureElement(el);
-      const link = document.createElement("a");
-      link.download = filename;
-      link.href = canvas.toDataURL("image/png", 1.0);
-      link.click();
+      // 1) Elementi klonla
+      const clone = el.cloneNode(true);
+
+      // 2) Tam boyut al
+      const fullW = el.scrollWidth;
+      const fullH = el.scrollHeight;
+
+      // 3) Görünmez ama DOM'da olan bir wrapper içine koy
+      const wrapper = document.createElement("div");
+      Object.assign(wrapper.style, {
+        position: "fixed",
+        top: "0",
+        left: "0",
+        width:  fullW + "px",
+        height: fullH + "px",
+        zIndex: "-9999",
+        pointerEvents: "none",
+        overflow: "hidden",
+        background: "#ffffff",
+      });
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
+      try {
+        const canvas = await window.html2canvas(wrapper, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          imageTimeout: 0,
+          width:  fullW,
+          height: fullH,
+          x: 0,
+          y: 0,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth:  fullW,
+          windowHeight: fullH,
+        });
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = canvas.toDataURL("image/png", 1.0);
+        link.click();
+      } finally {
+        document.body.removeChild(wrapper);
+      }
     });
   };
 
@@ -674,27 +679,65 @@ export default function App() {
     const el = bracketPanelRef.current;
     if (!el) return;
 
-    // Bracket'in scroll wrapper'ını bul ve geçici olarak aç
+    // Scroll wrapper'ı aç
     const scrollEl = el.querySelector(".bracket-scroll-wrapper");
-    const prevStyle = scrollEl ? scrollEl.getAttribute("style") || "" : null;
-
-    if (scrollEl) {
-      scrollEl.style.overflow  = "visible";
-      scrollEl.style.maxWidth  = "none";
-      scrollEl.style.minWidth  = scrollEl.scrollWidth + "px";
-    }
 
     loadHtml2Canvas(async () => {
+      // Tam içerik boyutunu al (scroll açılmadan önce)
+      const innerContent = scrollEl ? scrollEl.firstElementChild : el;
+      const fullW = innerContent ? innerContent.scrollWidth + 32 : el.scrollWidth;
+      const fullH = el.scrollHeight;
+
+      // Clone al
+      const clone = el.cloneNode(true);
+
+      // Clone içindeki scroll wrapper'ı aç
+      const cloneScroll = clone.querySelector(".bracket-scroll-wrapper");
+      if (cloneScroll) {
+        cloneScroll.style.overflow = "visible";
+        cloneScroll.style.width = fullW + "px";
+        cloneScroll.style.minWidth = fullW + "px";
+        cloneScroll.style.maxWidth = "none";
+      }
+
+      const wrapper = document.createElement("div");
+      Object.assign(wrapper.style, {
+        position: "fixed",
+        top: "0",
+        left: "0",
+        width:  fullW + "px",
+        height: fullH + "px",
+        zIndex: "-9999",
+        pointerEvents: "none",
+        overflow: "visible",
+        background: "#ffffff",
+      });
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
       try {
-        const canvas = await captureElement(el, { scale: 2.5 });
+        const canvas = await window.html2canvas(wrapper, {
+          scale: 2.5,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          imageTimeout: 0,
+          width:  fullW,
+          height: fullH,
+          x: 0,
+          y: 0,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth:  fullW,
+          windowHeight: fullH,
+        });
         const link = document.createElement("a");
         link.download = "turnuva_agaci_wc26.png";
         link.href = canvas.toDataURL("image/png", 1.0);
         link.click();
       } finally {
-        if (scrollEl) {
-          scrollEl.setAttribute("style", prevStyle);
-        }
+        document.body.removeChild(wrapper);
       }
     });
   };
