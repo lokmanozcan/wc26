@@ -1276,7 +1276,10 @@ export default function App() {
           gTeams.forEach(id=>{simPts[id]=0;simGd[id]=0;simGf[id]=0;});
           gFixtures.forEach(f=>{
             const oSc=officialScores[f.id], uSc=userScores[f.id], sSc=singleDisplayScores[f.id];
-            const sc=(oSc&&oSc.home!==""?oSc):(uSc&&uSc.home!==""?uSc):(sSc||{});
+            let sc={};
+            if(oSc && oSc.home !== "" && oSc.away !== "") { sc=oSc; }
+            else if(uSc && uSc.home !== "" && uSc.away !== "") { sc=uSc; }
+            else if(sSc) { sc=sSc; }
             const h=parseInt(sc.home)||0, a=parseInt(sc.away)||0;
             if(h>a){simPts[f.home]+=3;}else if(a>h){simPts[f.away]+=3;}else{simPts[f.home]+=1;simPts[f.away]+=1;}
             simGd[f.home]+=(h-a); simGd[f.away]+=(a-h);
