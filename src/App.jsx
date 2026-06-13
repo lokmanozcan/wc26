@@ -878,21 +878,22 @@ export default function App() {
 
     // --- Layout ---
     const CARD_W    = 130;
-    const CARD_H    = 52;
+    const CARD_H    = 52;  // 2 satır (her biri 24px) + 4px padding
     const ROW_H     = 24;
     const COL_GAP   = 18;
     const PAD       = 20;
-    const CENTER_W  = 240;  // daha geniş — finalist isimleri sığsın
-    const COLS      = 4;
+    const CENTER_W  = 200;
+    const COLS      = 4; // her yanda 4 sütun: r32, r16, qf, sf
     const SIDE_W    = COLS * CARD_W + (COLS - 1) * COL_GAP;
     const TOTAL_W   = PAD * 2 + SIDE_W * 2 + COL_GAP * 2 + CENTER_W;
 
-    const HEADER_H   = 36;
-    const COL_LABEL_H = 22;
+    // Her sütundaki maç sayısı: r32=8, r16=4, qf=2, sf=1
+    const MATCHES_PER_COL = [8, 4, 2, 1];
+    const HEADER_H  = 36;
     const MAX_MATCHES = 8;
-    const BRACKET_H  = MAX_MATCHES * CARD_H + (MAX_MATCHES - 1) * 6;
-    // Üçüncülük artık aşağıda değil, merkez sütunda → TOTAL_H sadece bracket
-    const TOTAL_H    = PAD + HEADER_H + COL_LABEL_H + BRACKET_H + PAD;
+    const BRACKET_H = MAX_MATCHES * CARD_H + (MAX_MATCHES - 1) * 6; // 6px gap
+    const THIRD_H   = CARD_H + 8;
+    const TOTAL_H   = PAD + HEADER_H + BRACKET_H + 20 + THIRD_H + PAD;
 
     const canvas = document.createElement("canvas");
     canvas.width  = TOTAL_W * DPR;
@@ -927,7 +928,7 @@ export default function App() {
       ctx.fillText(colLabels[COLS - 1 - ci], rightColX(ci), COL_LABEL_Y);
     });
 
-    const BRACKET_TOP = PAD + HEADER_H + COL_LABEL_H;
+    const BRACKET_TOP = PAD + HEADER_H + 22;
 
     // Maç kartı çizici
     const drawMatchCard = (m, x, y, knockoutScores) => {
@@ -1085,239 +1086,117 @@ export default function App() {
       });
     });
 
-    // ── MERKEZ: FİNAL + ÜÇÜNCÜLÜK ──────────────────────────────────────────────
-    const CX      = PAD + SIDE_W + COL_GAP;
-    const lsfX    = PAD + SIDE_W;
-    const rsfX    = PAD + SIDE_W + COL_GAP * 2 + CENTER_W;
-    const sfMidY  = getMatchY(0, 1) + CARD_H / 2;
+    // ── MERKEZ: FİNAL BLOĞU ──
+    const CX = PAD + SIDE_W + COL_GAP;
+    const sfLY = getMatchY(0, 1) + CARD_H / 2;
+    const sfRY = getMatchY(0, 1) + CARD_H / 2;
+    const centerMidY = (sfLY + sfRY) / 2;
+    const finalBlockH = 130;
+    const finalY = BRACKET_TOP + BRACKET_H / 2 - finalBlockH / 2;
 
-    // ── boyutlar (web UI'daki spacing'e sadık) ──
-    const F_HDR   = 28;   // Final başlık şeridi
-    const F_ROW   = 30;   // finalist satır yüksekliği
-    const F_BAR   = 11;   // progress bar alanı (üst+bar+alt)
-    const F_GAP   = 6;    // finalist satırları arası
-    const F_CHAMP = 42;   // şampiyon kutu
-    const F_PAD   = 10;   // iç üst/alt padding
-    const finalBlockH = F_HDR + F_PAD + F_ROW + F_GAP + F_BAR + F_ROW + F_PAD + 6 + F_CHAMP + F_PAD;
-
-    const T_HDR   = 22;   // Üçüncülük başlık şeridi
-    const T_ROW   = 28;   // üçüncülük satır yüksekliği
-    const T_GAP   = 4;    // satırlar arası
-    const T_PAD   = 8;    // iç üst/alt padding
-    const thirdBlockH = T_HDR + T_PAD + T_ROW + T_GAP + T_ROW + T_PAD;
-
-    const BETWEEN = 8;    // Final ile Üçüncülük arası boşluk
-    const centerTotalH = finalBlockH + BETWEEN + thirdBlockH;
-    const centerMidY   = sfMidY;                       // bracket dikey orta
-    const finalY       = centerMidY - centerTotalH / 2;
-    const thirdY       = finalY + finalBlockH + BETWEEN;
-
-    // SF bağlantı çizgileri (altın)
+    // Sol SF → Final bağlantısı
     ctx.strokeStyle = "#f59e0b";
-    ctx.lineWidth   = 1.5;
-    ctx.beginPath(); ctx.moveTo(lsfX + CARD_W, sfMidY); ctx.lineTo(CX, sfMidY); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(rsfX, sfMidY); ctx.lineTo(CX + CENTER_W, sfMidY); ctx.stroke();
-
-    // ── FİNAL KUTUSU ──────────────────────────────────────────────────────────
-    // dış glow efekti (ince shadow simülasyonu)
-    ctx.shadowColor   = "rgba(245,158,11,0.25)";
-    ctx.shadowBlur    = 18;
-    ctx.fillStyle     = "#0a0f1e";
-    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 14);
-    ctx.fill();
-    ctx.shadowBlur    = 0;
-
-    ctx.strokeStyle   = "rgba(245,158,11,0.35)";
-    ctx.lineWidth     = 1;
-    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 14);
+    ctx.lineWidth = 1.5;
+    const lsfX = PAD + SIDE_W;
+    const rsfX = rightStartX;
+    ctx.beginPath();
+    ctx.moveTo(lsfX + CARD_W, sfLY);
+    ctx.lineTo(CX, sfLY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(rsfX, sfRY);
+    ctx.lineTo(CX + CENTER_W, sfRY);
     ctx.stroke();
 
-    // Başlık gradient şerit
-    const hGrad = ctx.createLinearGradient(CX, 0, CX + CENTER_W, 0);
-    hGrad.addColorStop(0, "#b45309");
-    hGrad.addColorStop(0.5, "#f59e0b");
-    hGrad.addColorStop(1, "#b45309");
-    ctx.fillStyle = hGrad;
-    roundRect(ctx, CX, finalY, CENTER_W, F_HDR, 14);
+    // Final kutusu arka plan
+    ctx.fillStyle = "#0a0f1e";
+    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 12);
     ctx.fill();
-    ctx.fillRect(CX, finalY + F_HDR - 8, CENTER_W, 8); // alt köşeleri düzelt
+    ctx.strokeStyle = "rgba(245,158,11,0.4)";
+    ctx.lineWidth = 1;
+    roundRect(ctx, CX, finalY, CENTER_W, finalBlockH, 12);
+    ctx.stroke();
 
-    ctx.font          = "900 10px system-ui,sans-serif";
-    ctx.fillStyle     = "#ffffff";
-    ctx.textAlign     = "center";
-    ctx.textBaseline  = "middle";
-    ctx.fillText("★  FİNAL  ★", CX + CENTER_W / 2, finalY + F_HDR / 2);
+    // Final başlık şeridi
+    const grad = ctx.createLinearGradient(CX, 0, CX + CENTER_W, 0);
+    grad.addColorStop(0, "#d97706"); grad.addColorStop(1, "#f59e0b");
+    ctx.fillStyle = grad;
+    roundRect(ctx, CX, finalY, CENTER_W, 22, 12);
+    ctx.fill();
+    ctx.fillRect(CX, finalY + 10, CENTER_W, 12);
+    ctx.font = "900 8.5px system-ui";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("★  FİNAL  ★", CX + CENTER_W / 2, finalY + 11);
 
-    // finalist satırları
-    let curY = finalY + F_HDR + F_PAD;
+    // Final finalistleri
     [[bracket.finalMatch.idA, bracket.finalMatch.pA, bracket.finalMatch.winner === bracket.finalMatch.idA],
      [bracket.finalMatch.idB, bracket.finalMatch.pB, bracket.finalMatch.winner === bracket.finalMatch.idB]
     ].forEach(([id, pct, isWin], ri) => {
-      const ry   = curY;
-      const midY = ry + F_ROW / 2;
-
-      // satır arka plan
-      ctx.fillStyle = isWin ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.04)";
-      roundRect(ctx, CX + 8, ry, CENTER_W - 16, F_ROW, 7);
+      const fy = finalY + 26 + ri * 28;
+      const midY = fy + 13;
+      ctx.fillStyle = isWin ? "rgba(245,158,11,0.18)" : "rgba(255,255,255,0.05)";
+      roundRect(ctx, CX + 6, fy, CENTER_W - 12, 26, 6);
       ctx.fill();
-      ctx.strokeStyle = isWin ? "rgba(245,158,11,0.45)" : "rgba(255,255,255,0.07)";
-      ctx.lineWidth   = 1;
-      roundRect(ctx, CX + 8, ry, CENTER_W - 16, F_ROW, 7);
+      ctx.strokeStyle = isWin ? "rgba(245,158,11,0.4)" : "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 1;
+      roundRect(ctx, CX + 6, fy, CENTER_W - 12, 26, 6);
       ctx.stroke();
-
-      // sol accent şerit (kazanana)
-      if (isWin) {
-        ctx.fillStyle = "#f59e0b";
-        ctx.fillRect(CX + 8, ry + 4, 3, F_ROW - 8);
-      }
-
-      // bayrak
       const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
-      if (flag) ctx.drawImage(flag, CX + 16, midY - 7, 20, 14);
-
-      // isim
+      if (flag) ctx.drawImage(flag, CX + 12, midY - 6, 18, 12);
       ctx.save();
-      ctx.beginPath(); ctx.rect(CX + 40, ry, CENTER_W - 40 - 36, F_ROW); ctx.clip();
-      ctx.font         = isWin ? "800 12px system-ui" : "500 12px system-ui";
-      ctx.fillStyle    = isWin ? "#fbbf24" : "rgba(255,255,255,0.75)";
-      ctx.textAlign    = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 40, midY);
+      ctx.beginPath(); ctx.rect(CX + 34, fy, CENTER_W - 34 - 28, 26); ctx.clip();
+      ctx.font = isWin ? "800 11px system-ui" : "600 11px system-ui";
+      ctx.fillStyle = isWin ? "#fbbf24" : "rgba(255,255,255,0.7)";
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 34, midY);
       ctx.restore();
-
-      // yüzde
-      ctx.font         = "800 11px monospace";
-      ctx.fillStyle    = isWin ? "#fbbf24" : "rgba(255,255,255,0.38)";
-      ctx.textAlign    = "right";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${pct}%`, CX + CENTER_W - 10, midY);
-
-      curY += F_ROW + (ri === 0 ? F_GAP : 0);
-
-      // progress bar (ilk satırdan sonra)
+      ctx.font = "800 9.5px monospace";
+      ctx.fillStyle = isWin ? "#fbbf24" : "rgba(255,255,255,0.4)";
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(`${pct}%`, CX + CENTER_W - 8, midY);
       if (ri === 0) {
-        const barY = curY;
-        const barW = CENTER_W - 16;
-        // track
-        ctx.fillStyle = "rgba(255,255,255,0.07)";
-        roundRect(ctx, CX + 8, barY, barW, 5, 2.5); ctx.fill();
-        // A tarafı (yeşil)
+        const barY = fy + 26 + 2;
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        roundRect(ctx, CX + 6, barY, CENTER_W - 12, 4, 2); ctx.fill();
         ctx.fillStyle = "#10b981";
-        roundRect(ctx, CX + 8, barY, barW * bracket.finalMatch.pA / 100, 5, 2.5); ctx.fill();
-        // B tarafı (mavi)
-        const bStart = CX + 8 + barW * bracket.finalMatch.pA / 100;
-        ctx.fillStyle = "#3b82f6";
-        roundRect(ctx, bStart, barY, barW * bracket.finalMatch.pB / 100, 5, 2.5); ctx.fill();
-        curY += F_BAR;
+        roundRect(ctx, CX + 6, barY, (CENTER_W - 12) * bracket.finalMatch.pA / 100, 4, 2); ctx.fill();
       }
     });
 
-    // şampiyon kutu
-    curY += F_PAD;
-    const champY = curY;
-    const champGrad = ctx.createLinearGradient(CX, champY, CX, champY + F_CHAMP);
-    champGrad.addColorStop(0, "rgba(217,119,6,0.22)");
-    champGrad.addColorStop(1, "rgba(251,191,36,0.10)");
-    ctx.fillStyle = champGrad;
-    roundRect(ctx, CX + 8, champY, CENTER_W - 16, F_CHAMP, 10); ctx.fill();
-    ctx.strokeStyle = "rgba(245,158,11,0.45)"; ctx.lineWidth = 1;
-    roundRect(ctx, CX + 8, champY, CENTER_W - 16, F_CHAMP, 10); ctx.stroke();
+    // Şampiyon bloğu
+    const champY = finalY + 26 + 2 * 28 + 4 + 8;
+    ctx.fillStyle = "rgba(217,119,6,0.18)";
+    roundRect(ctx, CX + 6, champY, CENTER_W - 12, 34, 8); ctx.fill();
+    ctx.strokeStyle = "rgba(245,158,11,0.4)"; ctx.lineWidth = 1;
+    roundRect(ctx, CX + 6, champY, CENTER_W - 12, 34, 8); ctx.stroke();
+    ctx.font = "900 7.5px monospace";
+    ctx.fillStyle = "rgba(251,191,36,0.7)";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("DÜNYA ŞAMPİYONU", CX + CENTER_W / 2, champY + 9);
+    const wId = bracket.finalMatch.winner;
+    const wFlag = flagCache.current[INITIAL_TEAMS[wId]?.iso?.toLowerCase()];
+    const wName = INITIAL_TEAMS[wId]?.name || "---";
+    if (wFlag) ctx.drawImage(wFlag, CX + CENTER_W / 2 - 40, champY + 16, 22, 15);
+    ctx.font = "900 12px system-ui";
+    ctx.fillStyle = "#fbbf24";
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(wName, CX + CENTER_W / 2 - 14, champY + 24);
 
-    // "DÜNYA ŞAMPİYONU" label
-    ctx.font         = "700 8px monospace";
-    ctx.fillStyle    = "rgba(251,191,36,0.65)";
-    ctx.textAlign    = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("DÜNYA ŞAMPİYONU", CX + CENTER_W / 2, champY + 11);
+    // ── ÜÇÜNCÜLÜK MAÇI ──
+    const thirdY = BRACKET_TOP + BRACKET_H + 16;
+    const thirdBlockW = CARD_W * 2 + COL_GAP;
+    const thirdX = TOTAL_W / 2 - thirdBlockW / 2;
 
-    // kupa ikonu + bayrak + isim
-    const wId    = bracket.finalMatch.winner;
-    const wFlag  = flagCache.current[INITIAL_TEAMS[wId]?.iso?.toLowerCase()];
-    const wName  = INITIAL_TEAMS[wId]?.name || "---";
-    const wLineY = champY + F_CHAMP - 14;
+    ctx.fillStyle = "#7c3aed";
+    roundRect(ctx, thirdX, thirdY, thirdBlockW, 18, 6); ctx.fill();
+    ctx.font = "900 8px system-ui";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("★  ÜÇÜNCÜLÜK MAÇI  ★", thirdX + thirdBlockW / 2, thirdY + 9);
 
-    // kupa emoji yerine altın yıldız
-    ctx.font      = "bold 13px system-ui";
-    ctx.fillStyle = "#f59e0b";
-    ctx.textAlign = "right";
-    ctx.fillText("🏆", CX + CENTER_W / 2 - 28, wLineY);
-
-    if (wFlag) ctx.drawImage(wFlag, CX + CENTER_W / 2 - 22, wLineY - 8, 24, 17);
-    ctx.font         = "900 13px system-ui";
-    ctx.fillStyle    = "#fbbf24";
-    ctx.textAlign    = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(wName, CX + CENTER_W / 2 + 6, wLineY);
-
-    // ── ÜÇÜNCÜLÜK MAÇI ────────────────────────────────────────────────────────
-    // dış çerçeve (tüm blok)
-    ctx.shadowColor = "rgba(124,58,237,0.18)";
-    ctx.shadowBlur  = 12;
-    const thirdGrad = ctx.createLinearGradient(CX, 0, CX + CENTER_W, 0);
-    thirdGrad.addColorStop(0, "#6d28d9");
-    thirdGrad.addColorStop(0.5, "#a855f7");
-    thirdGrad.addColorStop(1, "#6d28d9");
-    ctx.fillStyle = thirdGrad;
-    roundRect(ctx, CX, thirdY, CENTER_W, T_HDR, 10); ctx.fill();
-    ctx.shadowBlur = 0;
-
-    ctx.font         = "900 8.5px system-ui";
-    ctx.fillStyle    = "#ffffff";
-    ctx.textAlign    = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("★  ÜÇÜNCÜLÜK MAÇI  ★", CX + CENTER_W / 2, thirdY + T_HDR / 2);
-
-    // Üçüncülük takım satırları (beyaz kart)
-    const tCardY = thirdY + T_HDR;
-    ctx.fillStyle   = "#ffffff";
-    roundRect(ctx, CX, tCardY, CENTER_W, T_PAD + T_ROW + T_GAP + T_ROW + T_PAD, 10);
-    ctx.fill();
-    ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 1;
-    roundRect(ctx, CX, tCardY, CENTER_W, T_PAD + T_ROW + T_GAP + T_ROW + T_PAD, 10);
-    ctx.stroke();
-
-    [[bracket.thirdPlaceMatch.idA, bracket.thirdPlaceMatch.pA, bracket.thirdPlaceMatch.winner === bracket.thirdPlaceMatch.idA],
-     [bracket.thirdPlaceMatch.idB, bracket.thirdPlaceMatch.pB, bracket.thirdPlaceMatch.winner === bracket.thirdPlaceMatch.idB]
-    ].forEach(([id, pct, isWin], ri) => {
-      const ry   = tCardY + T_PAD + ri * (T_ROW + T_GAP);
-      const midY = ry + T_ROW / 2;
-
-      if (isWin) {
-        ctx.fillStyle = "rgba(124,58,237,0.08)";
-        roundRect(ctx, CX + 8, ry, CENTER_W - 16, T_ROW, 6); ctx.fill();
-        ctx.strokeStyle = "rgba(124,58,237,0.25)"; ctx.lineWidth = 1;
-        roundRect(ctx, CX + 8, ry, CENTER_W - 16, T_ROW, 6); ctx.stroke();
-        // sol accent
-        ctx.fillStyle = "#7c3aed";
-        ctx.fillRect(CX + 8, ry + 4, 3, T_ROW - 8);
-      }
-
-      const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
-      if (flag) ctx.drawImage(flag, CX + 16, midY - 7, 20, 14);
-
-      ctx.save();
-      ctx.beginPath(); ctx.rect(CX + 40, ry, CENTER_W - 40 - 36, T_ROW); ctx.clip();
-      ctx.font         = isWin ? "700 12px system-ui" : "500 12px system-ui";
-      ctx.fillStyle    = isWin ? "#5b21b6" : "#374151";
-      ctx.textAlign    = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 40, midY);
-      ctx.restore();
-
-      if (isWin) {
-        ctx.font = "bold 11px system-ui";
-        ctx.fillStyle = "#7c3aed";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "middle";
-        ctx.fillText("★", CX + CENTER_W - 28, midY);
-      }
-
-      ctx.font         = "700 10.5px monospace";
-      ctx.fillStyle    = isWin ? "#7c3aed" : "#94a3b8";
-      ctx.textAlign    = "right";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${pct}%`, CX + CENTER_W - 10, midY);
-    });
+    drawMatchCard(bracket.thirdPlaceMatch, thirdX, thirdY + 20, knockoutScores);
 
     // İndir
     const link = document.createElement("a");
@@ -1350,6 +1229,7 @@ export default function App() {
   const [eloSearch, setEloSearch] = useState("");
   const [groupsSection, setGroupsSection] = useState("groups");
   const [activeGroupTab, setActiveGroupTab] = useState("A");
+  const [selectedTeamForEncounter, setSelectedTeamForEncounter] = useState(null);
 
   const activeTeams = Object.fromEntries(
     Object.entries(INITIAL_TEAMS).map(([k,v]) => [k, { ...v, elo: customElo[k] ?? v.elo }])
@@ -1470,11 +1350,26 @@ export default function App() {
     const SIM_COUNT = 1000;
     const stats = {};
     const matchupStats = {};
+    // encounterStats[idA][idB] = {r32:N, r16:N, qf:N, sf:N, f:N} — toplam eşleşme sayısı
+    const encounterStats = {};
     const firstSimDisplayScores = {};
 
     Object.keys(teams).forEach(id => {
       stats[id] = { id, r32:0,r16:0,qf:0,sf:0,f:0,champion:0,thirdPlaceChamp:0,g1:0,g2:0,g3:0,g4:0 };
+      encounterStats[id] = {};
     });
+
+    const addEncounter = (idA, idB, round) => {
+      if (!idA || !idB) return;
+      if (!encounterStats[idA]) encounterStats[idA] = {};
+      if (!encounterStats[idB]) encounterStats[idB] = {};
+      if (!encounterStats[idA][idB]) encounterStats[idA][idB] = { r32:0,r16:0,qf:0,sf:0,f:0, total:0 };
+      if (!encounterStats[idB][idA]) encounterStats[idB][idA] = { r32:0,r16:0,qf:0,sf:0,f:0, total:0 };
+      encounterStats[idA][idB][round]++;
+      encounterStats[idA][idB].total++;
+      encounterStats[idB][idA][round]++;
+      encounterStats[idB][idA].total++;
+    };
     
     const fixtures = generateAllFixtures();
 
@@ -1543,13 +1438,17 @@ export default function App() {
       ];
 
       r32Matches.forEach(m=>{ if(m[0]&&stats[m[0]])stats[m[0]].r32++; if(m[1]&&stats[m[1]])stats[m[1]].r32++; });
-      const runStage=(matches,nextKey)=>{
+      // R32 eşleşmelerini kaydet
+      r32Matches.forEach(m=>{ addEncounter(m[0],m[1],"r32"); });
+
+      const runStage=(matches,nextKey,roundKey)=>{
         const wL=[]; const loL=[];
         matches.forEach(m=>{
           const idA=m[0]; const idB=m[1]; if(!idB){wL.push(idA);return;}
           const pk=[idA,idB].sort().join("_vs_");
           if(!matchupStats[pk]) matchupStats[pk]={total:0,[idA]:0,[idB]:0};
           matchupStats[pk].total++;
+          addEncounter(idA, idB, roundKey);
           const pA=getWinProbability(teams[idA].elo,teams[idB].elo);
           if(Math.random()<pA){wL.push(idA);loL.push(idB);matchupStats[pk][idA]++;}
           else{wL.push(idB);loL.push(idA);matchupStats[pk][idB]++;}
@@ -1559,16 +1458,18 @@ export default function App() {
         return {pairs,losersList:loL};
       };
 
-      const r16R=runStage(r32Matches,"r16"); const qfR=runStage(r16R.pairs,"qf");
-      const sfR=runStage(qfR.pairs,"sf"); runStage(sfR.pairs,"f");
+      const r16R=runStage(r32Matches,"r16","r16"); const qfR=runStage(r16R.pairs,"qf","qf");
+      const sfR=runStage(qfR.pairs,"sf","sf"); runStage(sfR.pairs,"f","f");
       const sfM=sfR.pairs;
       if(sfM.length>=2){
         const sf1A=sfM[0][0],sf1B=sfM[0][1],sf2A=sfM[1][0],sf2B=sfM[1][1];
-        const w1=Math.random()<getWinProbability(teams[sf1A].elo,teams[sf1B].elo)?sf1A:sf1B; const l1=w1===sf1A?sf1B:sf1A;
-        const w2=Math.random()<getWinProbability(teams[sf2A].elo,teams[sf2B].elo)?sf2A:sf2B; const l2=w2===sf2A?sf2B:sf2A;
-        const champ=Math.random()<getWinProbability(teams[w1].elo,teams[w2].elo)?w1:w2;
+        const w1=Math.random()<getWinProbability(teams[sf1A]?.elo??1500,teams[sf1B]?.elo??1500)?sf1A:sf1B; const l1=w1===sf1A?sf1B:sf1A;
+        const w2=Math.random()<getWinProbability(teams[sf2A]?.elo??1500,teams[sf2B]?.elo??1500)?sf2A:sf2B; const l2=w2===sf2A?sf2B:sf2A;
+        addEncounter(w1,w2,"f"); // Final
+        const champ=Math.random()<getWinProbability(teams[w1]?.elo??1500,teams[w2]?.elo??1500)?w1:w2;
         if(stats[champ])stats[champ].champion++;
-        const tpw=Math.random()<getWinProbability(teams[l1].elo,teams[l2].elo)?l1:l2;
+        addEncounter(l1,l2,"f"); // 3.lük maçı (f'ye ekle)
+        const tpw=Math.random()<getWinProbability(teams[l1]?.elo??1500,teams[l2]?.elo??1500)?l1:l2;
         if(stats[tpw])stats[tpw].thirdPlaceChamp++;
       }
     }
@@ -1583,7 +1484,7 @@ export default function App() {
       stats[id].g3=(stats[id].g3/s)*100; stats[id].g4=(stats[id].g4/s)*100;
     });
 
-    return {teams:stats, matchups:matchupStats, displayScores:firstSimDisplayScores};
+    return {teams:stats, matchups:matchupStats, encounters:encounterStats, displayScores:firstSimDisplayScores};
   }
 
   const buildLiveBracket = () => {
@@ -1761,7 +1662,7 @@ export default function App() {
 
         {/* Desktop nav */}
         <nav className="desktop-nav" style={{display:"flex",background:"rgba(255,255,255,0.06)",padding:3,borderRadius:11,border:"1px solid rgba(255,255,255,0.1)",gap:2}}>
-          {[["bracket","Turnuva Ağacı"],["groupstats","Grup Analizi"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["elo","ELO Güncelle"]].map(([tab,label])=>(
+          {[["bracket","Turnuva Ağacı"],["groupstats","Grup Analizi"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["difficulty","Fikstür Zorluğu"],["elo","ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>setActiveTab(tab)} className={`nav-btn ${activeTab===tab?"active":"inactive"}`}>{label}</button>
           ))}
         </nav>
@@ -1782,7 +1683,7 @@ export default function App() {
       {/* Mobile dropdown menu */}
       {menuOpen && (
         <div className="mobile-menu" style={{position:"sticky",top:52,zIndex:190,background:"#0d1628",borderBottom:"1px solid rgba(255,255,255,0.10)",padding:"8px 12px",display:"flex",flexDirection:"column",gap:4,boxShadow:"0 8px 24px rgba(0,0,0,0.3)"}}>
-          {[["bracket","🏆 Turnuva Ağacı"],["groupstats","📈 Grup Analizi"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
+          {[["bracket","🏆 Turnuva Ağacı"],["groupstats","📈 Grup Analizi"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["difficulty","🎯 Fikstür Zorluğu"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>{setActiveTab(tab);setMenuOpen(false);}}
               style={{
                 width:"100%",textAlign:"left",padding:"11px 14px",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",border:"none",
@@ -2136,6 +2037,97 @@ export default function App() {
                 </div>
 
               </div>
+
+              {/* 5. Olası Karşılaşmalar */}
+              {simResults?.encounters && (() => {
+                const encTeamId = (selectedTeamForEncounter && gTeams.includes(selectedTeamForEncounter)) ? selectedTeamForEncounter : gTeams[0];
+                const teamEnc = simResults.encounters[encTeamId] || {};
+                const SIM = 1000;
+                const opponents = Object.entries(teamEnc)
+                  .map(([oppId, e]) => ({
+                    id: oppId,
+                    pct: (e.total / SIM) * 100,
+                    r32: (e.r32 / SIM) * 100,
+                    r16: (e.r16 / SIM) * 100,
+                    qf:  (e.qf  / SIM) * 100,
+                    sf:  (e.sf  / SIM) * 100,
+                    f:   (e.f   / SIM) * 100,
+                  }))
+                  .filter(o => o.pct >= 0.3)
+                  .sort((a, b) => b.pct - a.pct)
+                  .slice(0, 16);
+
+                const roundColors = { r32:"#64748b", r16:"#0284c7", qf:"#f59e0b", sf:"#ef4444", f:"#7c3aed" };
+                const roundLabels = { r32:"S32", r16:"S16", qf:"ÇF", sf:"YF", f:"F" };
+                const maxPct = opponents[0]?.pct || 1;
+
+                return (
+                  <div style={{...cardStyle}}>
+                    {sectionTitle("OLASI KARŞILAŞMALAR — TURNUVA BOYU","#1d4ed8")}
+                    <div style={{marginBottom:12,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>
+                      1.000× simülasyonda seçili takımın turnuva boyunca eşleştiği rakipler ve karşılaşma ihtimalleri
+                    </div>
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
+                      {gTeams.map(id => (
+                        <button key={id} onClick={()=>setSelectedTeamForEncounter(id)}
+                          style={{
+                            display:"flex",alignItems:"center",gap:5,padding:"5px 10px",
+                            borderRadius:8,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
+                            background: encTeamId===id?"linear-gradient(135deg,#1d4ed8,#3b82f6)":"#f1f5f9",
+                            color: encTeamId===id?"#fff":"#475569",
+                            boxShadow: encTeamId===id?"0 2px 8px rgba(29,78,216,0.3)":"none",
+                            transition:"all 0.15s",
+                          }}>
+                          <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover"}} alt="" />
+                          {INITIAL_TEAMS[id]?.name}
+                        </button>
+                      ))}
+                    </div>
+                    {opponents.length === 0 ? (
+                      <div style={{color:"#94a3b8",fontSize:11,fontStyle:"italic"}}>Yeterli simülasyon verisi bulunamadı.</div>
+                    ) : (
+                      <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                        {opponents.map((o, oi) => {
+                          const barW = (o.pct / maxPct) * 100;
+                          const rounds = ["r32","r16","qf","sf","f"].filter(r => o[r] >= 0.5);
+                          return (
+                            <div key={o.id} style={{
+                              display:"grid", gridTemplateColumns:"22px 1fr 80px 52px",
+                              alignItems:"center", gap:8, padding:"6px 8px", borderRadius:8,
+                              background: oi%2===0?"#f8fafc":"#ffffff", border:"1px solid #f1f5f9",
+                            }}>
+                              <span style={{fontSize:9.5,fontWeight:800,color:"#cbd5e1",fontFamily:"monospace",textAlign:"center"}}>{oi+1}</span>
+                              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                <img src={getFlagUrl(INITIAL_TEAMS[o.id]?.iso)} style={{width:18,height:12,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
+                                <div>
+                                  <div style={{fontSize:11.5,fontWeight:700,color:"#0f172a",lineHeight:1.2}}>{INITIAL_TEAMS[o.id]?.name||o.id}</div>
+                                  <div style={{display:"flex",gap:3,marginTop:2,flexWrap:"wrap"}}>
+                                    {rounds.map(r=>(
+                                      <span key={r} style={{fontSize:8,fontWeight:800,fontFamily:"monospace",padding:"1px 4px",borderRadius:3,background:`${roundColors[r]}18`,color:roundColors[r]}}>
+                                        {roundLabels[r]} {o[r].toFixed(0)}%
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{height:5,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
+                                <div style={{
+                                  width:`${barW}%`,height:"100%",borderRadius:3,
+                                  background: o.pct>30?"linear-gradient(90deg,#ef4444,#f97316)":o.pct>15?"linear-gradient(90deg,#f59e0b,#fbbf24)":"linear-gradient(90deg,#3b82f6,#60a5fa)",
+                                }}></div>
+                              </div>
+                              <span style={{fontSize:12,fontWeight:900,fontFamily:"monospace",textAlign:"right",color:o.pct>30?"#ef4444":o.pct>15?"#f59e0b":"#3b82f6"}}>
+                                {o.pct.toFixed(1)}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
             </div>
           );
         })()}
@@ -2268,6 +2260,170 @@ export default function App() {
             )}
           </div>
         )}
+
+        {/* === FİKSTÜR ZORLUĞU TAB === */}
+        {activeTab==="difficulty" && simResults?.encounters && (() => {
+          const SIM = 1000;
+          const allIds = Object.keys(INITIAL_TEAMS);
+
+          // Her takım için: eşleştiği rakiplerin ELO ağırlıklı ortalaması × karşılaşma sıklığı
+          // Zorluk = Σ(rakip_elo × karşılaşma_ihtimali) / Σ(karşılaşma_ihtimali)
+          const difficultyScores = allIds.map(id => {
+            const enc = simResults.encounters[id] || {};
+            let weightedElo = 0, totalWeight = 0, totalMatches = 0;
+            Object.entries(enc).forEach(([oppId, e]) => {
+              const pct = e.total / SIM; // 0–1 arası ihtimal
+              const oppElo = activeTeams[oppId]?.elo || 1500;
+              weightedElo += oppElo * pct;
+              totalWeight += pct;
+              totalMatches += e.total;
+            });
+            const avgOppElo = totalWeight > 0 ? weightedElo / totalWeight : 1500;
+            const t = simResults.teams[id] || {};
+            // Zorluk skoru: ağırlıklı rakip ELO'su × (ne kadar ilerlenirse o kadar ağır rakiplerle)
+            // Normalize: 1400=kolay, 2200=çok zor → 0–100 arası
+            const rawDiff = Math.max(0, Math.min(1, (avgOppElo - 1400) / 800));
+            // Ayrıca turnuvada ilerleme bonusu (QF'e çıkma ihtimali yüksekse daha fazla maç = daha zor)
+            const progressBonus = ((t.r16||0) + (t.qf||0)*1.5 + (t.sf||0)*2 + (t.f||0)*2.5) / (4*100);
+            const finalScore = Math.min(100, rawDiff * 70 + progressBonus * 30);
+            return {
+              id,
+              score: finalScore,
+              avgOppElo: Math.round(avgOppElo),
+              totalMatches,
+              advanceR16: t.r16 || 0,
+              advanceQF:  t.qf  || 0,
+              advanceSF:  t.sf  || 0,
+              advanceF:   t.f   || 0,
+              champion:   t.champion || 0,
+            };
+          }).sort((a, b) => b.score - a.score);
+
+          const maxScore = difficultyScores[0]?.score || 1;
+          const minScore = difficultyScores[difficultyScores.length-1]?.score || 0;
+
+          const getDiffColor = (score) => {
+            if (score >= 70) return "#ef4444";
+            if (score >= 55) return "#f97316";
+            if (score >= 40) return "#f59e0b";
+            if (score >= 25) return "#3b82f6";
+            return "#10b981";
+          };
+          const getDiffLabel = (score) => {
+            if (score >= 70) return "ÇOK ZOR";
+            if (score >= 55) return "ZOR";
+            if (score >= 40) return "ORTA";
+            if (score >= 25) return "KOLAY";
+            return "ÇOK KOLAY";
+          };
+
+          return (
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              {/* Başlık kart */}
+              <div style={{background:"linear-gradient(135deg,#0f172a,#1e293b)",borderRadius:14,padding:"16px 20px",border:"1px solid rgba(245,158,11,0.2)",boxShadow:"0 4px 20px rgba(0,0,0,0.1)"}}>
+                <div style={{fontSize:14,fontWeight:900,color:"#f59e0b",letterSpacing:"0.05em",marginBottom:4}}>🎯 FİKSTÜR ZORLUĞU ANALİZİ</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",fontFamily:"monospace"}}>
+                  1.000× Monte Carlo simülasyonunda her takımın turnuva boyunca karşılaştığı rakiplerin ELO ağırlıklı ortalaması ve ilerleme bonusu baz alınarak hesaplandı.
+                  <br/>Zorluk skoru 0–100 arası: rakip ELO'su (70%) + ilerleme derinliği bonusu (30%)
+                </div>
+              </div>
+
+              <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead>
+                    <tr style={{background:"#f8fafc",borderBottom:"2px solid #e2e8f0"}}>
+                      {["#","TAKIM","ELO","ORT. RAKİP ELO","FİKSTÜR ZORLUĞU","ZORLUK SKORU","S16","ÇF","YF","F","ŞAMPİYON"].map((h,hi)=>(
+                        <th key={hi} style={{
+                          padding:"10px 8px",fontSize:9,fontWeight:800,color:"#94a3b8",
+                          textAlign:hi<=1?"left":"center",letterSpacing:"0.05em",
+                          fontFamily:"monospace",whiteSpace:"nowrap",
+                        }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {difficultyScores.map((item, idx) => {
+                      const team = INITIAL_TEAMS[item.id];
+                      const myElo = activeTeams[item.id]?.elo || 1500;
+                      const color = getDiffColor(item.score);
+                      const label = getDiffLabel(item.score);
+                      const barPct = (item.score / 100) * 100;
+                      const isTop10 = idx < 10;
+                      return (
+                        <tr key={item.id} style={{
+                          borderBottom:"1px solid #f1f5f9",
+                          background: idx%2===0?"#ffffff":"#fafbfc",
+                          borderLeft:`3px solid ${idx<3?color:"transparent"}`,
+                        }}>
+                          {/* # */}
+                          <td style={{padding:"8px 8px",fontSize:11,fontWeight:800,color: idx<3?color:"#cbd5e1",fontFamily:"monospace",textAlign:"center",width:28}}>
+                            {idx===0?"🔴":idx===1?"🟠":idx===2?"🟡":idx+1}
+                          </td>
+                          {/* Takım */}
+                          <td style={{padding:"8px 10px",minWidth:130}}>
+                            <div style={{display:"flex",alignItems:"center",gap:7}}>
+                              <img src={getFlagUrl(team?.iso)} style={{width:20,height:14,borderRadius:2,objectFit:"cover",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}} alt="" />
+                              <span style={{fontSize:12,fontWeight:700,color:"#0f172a"}}>{team?.name}</span>
+                            </div>
+                          </td>
+                          {/* Kendi ELO */}
+                          <td style={{padding:"8px 6px",textAlign:"center"}}>
+                            <span style={{fontSize:11,fontWeight:700,fontFamily:"monospace",color:"#0284c7"}}>{myElo}</span>
+                          </td>
+                          {/* Ort. Rakip ELO */}
+                          <td style={{padding:"8px 6px",textAlign:"center"}}>
+                            <span style={{
+                              fontSize:11,fontWeight:700,fontFamily:"monospace",
+                              color: item.avgOppElo > 1900 ? "#ef4444" : item.avgOppElo > 1750 ? "#f59e0b" : "#10b981",
+                            }}>{item.avgOppElo}</span>
+                          </td>
+                          {/* Bar */}
+                          <td style={{padding:"8px 10px",minWidth:120}}>
+                            <div style={{height:7,background:"#f1f5f9",borderRadius:4,overflow:"hidden",width:"100%"}}>
+                              <div style={{
+                                width:`${barPct}%`,height:"100%",borderRadius:4,
+                                background:`linear-gradient(90deg,${color}88,${color})`,
+                                transition:"width 0.4s",
+                              }}></div>
+                            </div>
+                          </td>
+                          {/* Zorluk Skoru + Etiket */}
+                          <td style={{padding:"8px 8px",textAlign:"center",whiteSpace:"nowrap"}}>
+                            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                              <span style={{fontSize:13,fontWeight:900,fontFamily:"monospace",color}}>{item.score.toFixed(1)}</span>
+                              <span style={{fontSize:8,fontWeight:800,padding:"1px 5px",borderRadius:3,background:`${color}18`,color,letterSpacing:"0.05em"}}>{label}</span>
+                            </div>
+                          </td>
+                          {/* İlerleme yüzdeleri */}
+                          {[item.advanceR16, item.advanceQF, item.advanceSF, item.advanceF, item.champion].map((v,vi)=>(
+                            <td key={vi} style={{padding:"8px 4px",textAlign:"center"}}>
+                              <span style={{
+                                fontSize:10.5,fontWeight: v>20?800:600,fontFamily:"monospace",
+                                color: v>40?"#ef4444":v>20?"#f59e0b":v>5?"#0284c7":"#cbd5e1",
+                              }}>{v.toFixed(1)}%</span>
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Renk açıklaması */}
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",padding:"10px 14px",background:"#ffffff",borderRadius:10,border:"1px solid #e2e8f0"}}>
+                {[["ÇOK ZOR","#ef4444"],["ZOR","#f97316"],["ORTA","#f59e0b"],["KOLAY","#3b82f6"],["ÇOK KOLAY","#10b981"]].map(([lbl,clr])=>(
+                  <div key={lbl} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,fontWeight:700,color:"#475569"}}>
+                    <span style={{width:10,height:10,borderRadius:2,background:clr,display:"inline-block"}}></span>{lbl}
+                  </div>
+                ))}
+                <div style={{marginLeft:"auto",fontSize:9,color:"#94a3b8",fontFamily:"monospace",alignSelf:"center"}}>
+                  * ELO bazlı hesaplama — 1.000× simülasyon
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* === MATRIX TAB === */}
         {activeTab==="matrix" && simResults && (() => {
