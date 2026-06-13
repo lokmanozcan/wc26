@@ -607,6 +607,38 @@ export default function App() {
   const [simResults, setSimResults] = useState(null);
   const [singleDisplayScores, setSingleDisplayScores] = useState({});
   const [liveTableData, setLiveTableData] = useState({ groups: {}, thirds: [] });
+  const groupsPanelRef = useRef(null);
+  const bracketPanelRef = useRef(null);
+
+  // Yüksek çözünürlüklü görsel indirme yardımcısı
+  const downloadAsImage = async (ref, filename, scale=3) => {
+    if(!ref.current) return;
+    try {
+      const html2canvas = (await import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js")).default;
+      const canvas = await html2canvas(ref.current, {
+        scale, useCORS:true, allowTaint:true, backgroundColor:"#ffffff",
+        logging:false, imageTimeout:0
+      });
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = canvas.toDataURL("image/png", 1.0);
+      link.click();
+    } catch(e) {
+      // fallback: script tag yükle
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      script.onload = async () => {
+        const canvas = await window.html2canvas(ref.current, {
+          scale, useCORS:true, allowTaint:true, backgroundColor:"#ffffff", logging:false
+        });
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = canvas.toDataURL("image/png", 1.0);
+        link.click();
+      };
+      document.head.appendChild(script);
+    }
+  };
 
   // --- ELO otomatik güncelleme (saatte bir) ---
   useEffect(() => {
@@ -631,6 +663,7 @@ export default function App() {
   }, []);
   const [eloSearch, setEloSearch] = useState("");
   const [groupsSection, setGroupsSection] = useState("groups");
+  const [activeGroupTab, setActiveGroupTab] = useState("A");
 
   const activeTeams = Object.fromEntries(
     Object.entries(INITIAL_TEAMS).map(([k,v]) => [k, { ...v, elo: customElo[k] ?? v.elo }])
@@ -723,7 +756,7 @@ export default function App() {
     const firstSimDisplayScores = {};
 
     Object.keys(teams).forEach(id => {
-      stats[id] = { id, r32:0,r16:0,qf:0,sf:0,f:0,champion:0,thirdPlaceChamp:0 };
+      stats[id] = { id, r32:0,r16:0,qf:0,sf:0,f:0,champion:0,thirdPlaceChamp:0,g1:0,g2:0,g3:0,g4:0 };
     });
     
     const fixtures = generateAllFixtures();
@@ -760,6 +793,11 @@ export default function App() {
         const sorted=[...gTeams].sort((a,b)=>points[b]-points[a]||gd[b]-gd[a]||gf[b]-gf[a]||teams[b].elo-teams[a].elo);
         winners[gName]=sorted[0]; runners[gName]=sorted[1];
         thirds.push({id:sorted[2],group:gName,pts:points[sorted[2]],gd:gd[sorted[2]],gf:gf[sorted[2]],elo:teams[sorted[2]].elo});
+        // Grup bitiş pozisyonu istatistikleri
+        if(stats[sorted[0]])stats[sorted[0]].g1++;
+        if(stats[sorted[1]])stats[sorted[1]].g2++;
+        if(stats[sorted[2]])stats[sorted[2]].g3++;
+        if(stats[sorted[3]])stats[sorted[3]].g4++;
       });
 
       const bestThirds = [...thirds].sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || b.elo - a.elo);
@@ -824,6 +862,8 @@ export default function App() {
       stats[id].qf=(stats[id].qf/s)*100; stats[id].sf=(stats[id].sf/s)*100;
       stats[id].f=(stats[id].f/s)*100; stats[id].champion=(stats[id].champion/s)*100;
       stats[id].thirdPlaceChamp=(stats[id].thirdPlaceChamp/s)*100;
+      stats[id].g1=(stats[id].g1/s)*100; stats[id].g2=(stats[id].g2/s)*100;
+      stats[id].g3=(stats[id].g3/s)*100; stats[id].g4=(stats[id].g4/s)*100;
     });
 
     return {teams:stats, matchups:matchupStats, displayScores:firstSimDisplayScores};
@@ -1004,7 +1044,7 @@ export default function App() {
 
         {/* Desktop nav */}
         <nav className="desktop-nav" style={{display:"flex",background:"rgba(255,255,255,0.06)",padding:3,borderRadius:11,border:"1px solid rgba(255,255,255,0.1)",gap:2}}>
-          {[["bracket","Turnuva Ağacı"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["elo","ELO Güncelle"]].map(([tab,label])=>(
+          {[["bracket","Turnuva Ağacı"],["groupstats","Grup Analizi"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["elo","ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>setActiveTab(tab)} className={`nav-btn ${activeTab===tab?"active":"inactive"}`}>{label}</button>
           ))}
         </nav>
@@ -1025,7 +1065,7 @@ export default function App() {
       {/* Mobile dropdown menu */}
       {menuOpen && (
         <div className="mobile-menu" style={{position:"sticky",top:52,zIndex:190,background:"#0d1628",borderBottom:"1px solid rgba(255,255,255,0.10)",padding:"8px 12px",display:"flex",flexDirection:"column",gap:4,boxShadow:"0 8px 24px rgba(0,0,0,0.3)"}}>
-          {[["bracket","🏆 Turnuva Ağacı"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
+          {[["bracket","🏆 Turnuva Ağacı"],["groupstats","📈 Grup Analizi"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>{setActiveTab(tab);setMenuOpen(false);}}
               style={{
                 width:"100%",textAlign:"left",padding:"11px 14px",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",border:"none",
@@ -1043,8 +1083,21 @@ export default function App() {
         {/* === BRACKET TAB === */}
         {activeTab==="bracket" && bracket && (
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {/* İndirme Butonları */}
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
+              <button onClick={()=>downloadAsImage(groupsPanelRef,"gruplar_ve_3ler_wc26.png",3)}
+                style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:"linear-gradient(135deg,#0ea5e9,#0284c7)",border:"none",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",boxShadow:"0 2px 8px rgba(2,132,199,0.35)",letterSpacing:"0.04em",fontFamily:"monospace"}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                GRUPLAR + 3.LER
+              </button>
+              <button onClick={()=>downloadAsImage(bracketPanelRef,"turnuva_agaci_wc26.png",2.5)}
+                style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:"linear-gradient(135deg,#f59e0b,#d97706)",border:"none",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",boxShadow:"0 2px 8px rgba(217,119,6,0.35)",letterSpacing:"0.04em",fontFamily:"monospace"}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                TURNUVA AĞACI
+              </button>
+            </div>
             {/* 4x3 Groups Grid + 3.ler Panel — mobilde dikey */}
-            <div className="bracket-top-panel">
+            <div className="bracket-top-panel" ref={groupsPanelRef}>
               {/* Groups 4x3 */}
               <div style={{flex:1,minWidth:0,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
                 <div className="groups-panel-grid">{renderGroups()}</div>
@@ -1103,7 +1156,7 @@ export default function App() {
               </div>
             </div>
             {/* Bracket Wrapper - premium dark header */}
-            <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.04)"}}>
+            <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.04)"}} ref={bracketPanelRef}>
               {/* Stage labels bar */}
               <div style={{background:"#0a0f1e",padding:"10px 14px",display:"flex",justifyContent:"space-between",gap:"8px",alignItems:"center"}}>
                 {[["SON 32","rgba(255,255,255,0.4)"],["SON 16","rgba(255,255,255,0.5)"],["ÇEYREK F.","rgba(255,255,255,0.65)"],["YARI F.","rgba(255,255,255,0.8)"],null,["YARI F.","rgba(255,255,255,0.8)"],["ÇEYREK F.","rgba(255,255,255,0.65)"],["SON 16","rgba(255,255,255,0.5)"],["SON 32","rgba(255,255,255,0.4)"]].map((item, i) => 
@@ -1127,6 +1180,245 @@ export default function App() {
             </div>
           </div>
         )}
+
+
+        {/* === GRUP ANALİZİ TAB === */}
+        {activeTab==="groupstats" && simResults && liveTableData.groups && (() => {
+          const groupKeys = Object.keys(GROUPS_CONFIG);
+          const allGroupFixtures = generateAllFixtures();
+
+          // Seçili grubun verileri
+          const gName = activeGroupTab;
+          const gTeams = GROUPS_CONFIG[gName] || [];
+          const gFixtures = allGroupFixtures.filter(f => f.group === gName);
+          const liveRows = liveTableData.groups[gName] || [];
+          const qualThirdIds = new Set((liveTableData.thirds||[]).slice(0,8).map(t=>t.id));
+
+          // Simüle puan durumu (officialScores + singleDisplayScores)
+          const simPts={}, simGd={}, simGf={};
+          gTeams.forEach(id=>{simPts[id]=0;simGd[id]=0;simGf[id]=0;});
+          gFixtures.forEach(f=>{
+            const sc = officialScores[f.id] || singleDisplayScores[f.id] || {};
+            const h=parseInt(sc.home)||0, a=parseInt(sc.away)||0;
+            if(h>a){simPts[f.home]+=3;}else if(a>h){simPts[f.away]+=3;}else{simPts[f.home]+=1;simPts[f.away]+=1;}
+            simGd[f.home]+=(h-a); simGd[f.away]+=(a-h);
+            simGf[f.home]+=h; simGf[f.away]+=a;
+          });
+          const simSorted=[...gTeams].sort((a,b)=>simPts[b]-simPts[a]||simGd[b]-simGd[a]||simGf[b]-simGf[a]||activeTeams[b].elo-activeTeams[a].elo);
+
+          const cardStyle = {background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 16px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"};
+          const sectionTitle = (label, color="#047857") => (
+            <div style={{fontSize:11,fontWeight:900,color,letterSpacing:"0.07em",textTransform:"uppercase",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:10,display:"flex",alignItems:"center",gap:7}}>
+              <span style={{width:3,height:16,background:color,borderRadius:2,display:"inline-block"}}></span>
+              {label}
+            </div>
+          );
+
+          const posColors = ["#059669","#0284c7","#f59e0b","#ef4444"];
+          const posLabels = ["1.", "2.", "3.", "4."];
+
+          return (
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {/* Grup seçim tab bar */}
+              <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:12,padding:5,display:"flex",gap:3,flexWrap:"wrap",boxShadow:"0 2px 6px rgba(0,0,0,0.03)"}}>
+                {groupKeys.map(g=>(
+                  <button key={g} onClick={()=>setActiveGroupTab(g)}
+                    style={{
+                      padding:"5px 12px",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",border:"none",
+                      background:activeGroupTab===g?"linear-gradient(135deg,#10b981,#059669)":"transparent",
+                      color:activeGroupTab===g?"#fff":"#475569",
+                      boxShadow:activeGroupTab===g?"0 2px 8px rgba(16,185,129,0.25)":"none",
+                      transition:"all 0.15s", minWidth:36, letterSpacing:"0.04em",
+                      fontFamily:"'JetBrains Mono',monospace"
+                    }}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:12}}>
+
+                {/* 1. Anlık Resmi Puan Durumu */}
+                <div style={cardStyle}>
+                  {sectionTitle(`GRUP ${gName} — ANLK PUAN DURUMU`,"#047857")}
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead>
+                      <tr>
+                        {["#","Takım","O","G","B","M","AG","AY","AV","P"].map(h=>(
+                          <th key={h} style={{fontSize:9.5,fontWeight:800,color:"#94a3b8",textAlign:h==="Takım"?"left":"center",padding:"4px 5px",letterSpacing:"0.04em",fontFamily:"monospace",borderBottom:"2px solid #f1f5f9"}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liveRows.map((item,idx)=>{
+                        const id=item.id;
+                        const isTop2=idx<2, isQThird=idx===2&&qualThirdIds.has(id);
+                        const bg=isTop2?"rgba(16,185,129,0.07)":isQThird?"rgba(249,115,22,0.07)":"transparent";
+                        const accent=isTop2?"#10b981":isQThird?"#f97316":"transparent";
+                        const nameClr=isTop2?"#065f46":isQThird?"#9a3412":"#374151";
+                        // Hesapla: oynanan/galibiyet/beraberlik/mağlubiyet/atılan/yenilen
+                        let p=0,w=0,d=0,l=0,gfv=0,gav=0;
+                        gFixtures.forEach(f=>{
+                          const sc=officialScores[f.id];
+                          if(!sc||sc.home===""||sc.away==="")return;
+                          const h=parseInt(sc.home),a=parseInt(sc.away);
+                          if(f.home===id){p++;gfv+=h;gav+=a;if(h>a)w++;else if(h===a)d++;else l++;}
+                          else if(f.away===id){p++;gfv+=a;gav+=h;if(a>h)w++;else if(h===a)d++;else l++;}
+                        });
+                        return (
+                          <tr key={id} style={{borderBottom:"1px solid #f8fafc",background:bg,borderLeft:`3px solid ${accent}`}}>
+                            <td style={{textAlign:"center",padding:"5px 4px",fontSize:10.5,fontFamily:"monospace",color:isTop2?"#059669":isQThird?"#ea580c":"#cbd5e1",fontWeight:700}}>{idx+1}</td>
+                            <td style={{padding:"5px 6px"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                                <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover"}} alt="" />
+                                <span style={{fontSize:11.5,fontWeight:700,color:nameClr,whiteSpace:"nowrap"}}>{INITIAL_TEAMS[id]?.name}</span>
+                              </div>
+                            </td>
+                            <td style={{textAlign:"center",fontSize:11,fontFamily:"monospace",color:"#374151",padding:"5px 4px"}}>{p}</td>
+                            <td style={{textAlign:"center",fontSize:11,fontFamily:"monospace",color:"#059669",padding:"5px 4px",fontWeight:700}}>{w}</td>
+                            <td style={{textAlign:"center",fontSize:11,fontFamily:"monospace",color:"#94a3b8",padding:"5px 4px"}}>{d}</td>
+                            <td style={{textAlign:"center",fontSize:11,fontFamily:"monospace",color:"#dc2626",padding:"5px 4px"}}>{l}</td>
+                            <td style={{textAlign:"center",fontSize:11,fontFamily:"monospace",color:"#374151",padding:"5px 4px"}}>{gfv}</td>
+                            <td style={{textAlign:"center",fontSize:11,fontFamily:"monospace",color:"#374151",padding:"5px 4px"}}>{gav}</td>
+                            <td style={{textAlign:"center",fontSize:11,fontFamily:"monospace",fontWeight:700,color:item.gd>0?"#1d4ed8":item.gd<0?"#dc2626":"#94a3b8",padding:"5px 4px"}}>{item.gd>0?`+${item.gd}`:item.gd}</td>
+                            <td style={{textAlign:"center",padding:"5px 4px"}}>
+                              <span style={{fontFamily:"monospace",fontWeight:900,fontSize:13,color:isTop2?"#047857":isQThird?"#ea580c":"#0f172a"}}>{item.pts}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{marginTop:8,display:"flex",gap:10,flexWrap:"wrap"}}>
+                    {[["#10b981","Son 16'ya geçer (İlk 2)"],["#f97316","3.ler sırasına girer"]].map(([c,l])=>(
+                      <div key={l} style={{display:"flex",alignItems:"center",gap:4,fontSize:9.5,color:"#94a3b8"}}>
+                        <span style={{width:8,height:8,borderRadius:2,background:c,opacity:0.7,display:"inline-block"}}></span>{l}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Fikstür */}
+                <div style={cardStyle}>
+                  {sectionTitle(`GRUP ${gName} — FİKSTÜR`,"#0284c7")}
+                  <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                    {gFixtures.map(f=>{
+                      const off=officialScores[f.id], usr=userScores[f.id];
+                      const hasOff=off&&off.home!==""&&off.away!=="";
+                      const hasUsr=usr&&usr.home!==""&&usr.away!=="";
+                      const simSc=singleDisplayScores[f.id];
+                      const isSim=!hasOff&&!hasUsr&&simSc;
+                      const hScore=hasOff?off.home:hasUsr?usr.home:simSc?.home??"–";
+                      const aScore=hasOff?off.away:hasUsr?usr.away:simSc?.away??"–";
+                      const hWin=hScore!==""&&aScore!==""&&parseInt(hScore)>parseInt(aScore);
+                      const aWin=hScore!==""&&aScore!==""&&parseInt(aScore)>parseInt(hScore);
+                      const borderClr=hasOff?"#10b981":hasUsr?"#f59e0b":isSim?"rgba(59,130,246,0.3)":"#e2e8f0";
+                      const bgClr=hasOff?"rgba(16,185,129,0.05)":hasUsr?"rgba(245,158,11,0.04)":isSim?"rgba(59,130,246,0.02)":"#fafbfc";
+                      return (
+                        <div key={f.id} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 8px",borderRadius:8,border:`1px solid ${borderClr}`,background:bgClr}}>
+                          <div style={{flex:1,display:"flex",alignItems:"center",gap:5,justifyContent:"flex-end"}}>
+                            <span style={{fontSize:11.5,fontWeight:hWin?700:500,color:hWin?"#047857":"#374151",textAlign:"right"}}>{INITIAL_TEAMS[f.home]?.name}</span>
+                            <img src={getFlagUrl(INITIAL_TEAMS[f.home]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:3,padding:"0 4px",flexShrink:0}}>
+                            <span style={{fontFamily:"monospace",fontWeight:900,fontSize:13,color:hWin?"#047857":aWin?"#94a3b8":"#374151",minWidth:14,textAlign:"center"}}>{hScore}</span>
+                            <span style={{color:"#94a3b8",fontWeight:700,fontSize:12}}>:</span>
+                            <span style={{fontFamily:"monospace",fontWeight:900,fontSize:13,color:aWin?"#047857":hWin?"#94a3b8":"#374151",minWidth:14,textAlign:"center"}}>{aScore}</span>
+                          </div>
+                          <div style={{flex:1,display:"flex",alignItems:"center",gap:5}}>
+                            <img src={getFlagUrl(INITIAL_TEAMS[f.away]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover",flexShrink:0}} alt="" />
+                            <span style={{fontSize:11.5,fontWeight:aWin?700:500,color:aWin?"#047857":"#374151"}}>{INITIAL_TEAMS[f.away]?.name}</span>
+                          </div>
+                          <span style={{fontSize:8,fontFamily:"monospace",fontWeight:800,color:hasOff?"#059669":hasUsr?"#d97706":isSim?"#3b82f6":"#cbd5e1",flexShrink:0,minWidth:28,textAlign:"right"}}>
+                            {hasOff?"RESMİ":hasUsr?"TAH":isSim?"SIM":"—"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Simüle Puan Durumu */}
+                <div style={cardStyle}>
+                  {sectionTitle(`GRUP ${gName} — SİMÜLE PUAN DURUMU`,"#7c3aed")}
+                  <div style={{marginBottom:8,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>Resmi + Tahmin + Monte Carlo simülasyon skorlarıyla oluşturulan beklenen tablo</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                    {simSorted.map((id,idx)=>{
+                      const isTop2=idx<2,isThird=idx===2;
+                      const bg=isTop2?"rgba(16,185,129,0.07)":isThird?"rgba(249,115,22,0.07)":"transparent";
+                      const accent=isTop2?"#10b981":isThird?"#f97316":"transparent";
+                      const gdClr=simGd[id]>0?"#1d4ed8":simGd[id]<0?"#dc2626":"#94a3b8";
+                      return (
+                        <div key={id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px 5px 10px",borderRadius:8,background:bg,borderLeft:`3px solid ${accent}`}}>
+                          <span style={{fontSize:10,fontFamily:"monospace",color:isTop2?"#059669":isThird?"#ea580c":"#cbd5e1",fontWeight:700,minWidth:14}}>{idx+1}</span>
+                          <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover"}} alt="" />
+                          <span style={{flex:1,fontSize:12,fontWeight:isTop2||isThird?700:500,color:isTop2?"#065f46":isThird?"#9a3412":"#374151"}}>{INITIAL_TEAMS[id]?.name}</span>
+                          <span style={{fontSize:11,fontFamily:"monospace",fontWeight:700,color:gdClr,minWidth:32,textAlign:"center"}}>{simGd[id]>0?`+${simGd[id]}`:simGd[id]}</span>
+                          <span style={{fontSize:13,fontFamily:"monospace",fontWeight:900,color:isTop2?"#047857":isThird?"#ea580c":"#0f172a",minWidth:24,textAlign:"center"}}>{simPts[id]}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 4. Bitiş Pozisyonu Olasılıkları */}
+                <div style={cardStyle}>
+                  {sectionTitle(`GRUP ${gName} — POZİSYON OLASILIKLARI`,"#b45309")}
+                  <div style={{marginBottom:10,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>10.000× Monte Carlo simülasyonuna göre her takımın grubu kaçıncı sırada bitirme ihtimali</div>
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead>
+                      <tr>
+                        <th style={{textAlign:"left",padding:"5px 8px",fontSize:10,fontWeight:800,color:"#94a3b8",letterSpacing:"0.04em",borderBottom:"2px solid #f1f5f9"}}>TAKIM</th>
+                        {posLabels.map((l,i)=>(
+                          <th key={l} style={{textAlign:"center",padding:"5px 8px",fontSize:10,fontWeight:800,color:posColors[i],letterSpacing:"0.04em",borderBottom:"2px solid #f1f5f9"}}>{l} SIRADA</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gTeams.map((id,ti)=>{
+                        const t = simResults.teams[id]||{};
+                        const vals=[t.g1??0,t.g2??0,t.g3??0,t.g4??0];
+                        const maxVal=Math.max(...vals);
+                        return (
+                          <tr key={id} style={{borderBottom:"1px solid #f8fafc",background:ti%2===0?"#ffffff":"#fafbfc"}}>
+                            <td style={{padding:"6px 8px"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                                <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:16,height:11,borderRadius:2,objectFit:"cover"}} alt="" />
+                                <span style={{fontSize:11.5,fontWeight:600,color:"#0f172a"}}>{INITIAL_TEAMS[id]?.name}</span>
+                              </div>
+                            </td>
+                            {vals.map((v,vi)=>{
+                              const isMax=v===maxVal&&v>0;
+                              const barW=maxVal>0?Math.round((v/100)*52):0;
+                              return (
+                                <td key={vi} style={{textAlign:"center",padding:"6px 4px"}}>
+                                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                                    <div style={{width:52,height:5,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
+                                      <div style={{width:`${v}%`,height:"100%",background:posColors[vi],borderRadius:3,opacity:isMax?1:0.55,transition:"width 0.3s"}}></div>
+                                    </div>
+                                    <span style={{fontFamily:"monospace",fontWeight:isMax?900:600,fontSize:11,color:isMax?posColors[vi]:"#64748b"}}>{v.toFixed(1)}%</span>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{marginTop:10,display:"flex",gap:10,flexWrap:"wrap"}}>
+                    {posLabels.map((l,i)=>(
+                      <div key={l} style={{display:"flex",alignItems:"center",gap:4,fontSize:9.5,color:"#94a3b8"}}>
+                        <span style={{width:8,height:8,borderRadius:2,background:posColors[i],display:"inline-block"}}></span>{l} Sıra
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          );
+        })()}
 
         {/* === SKOR GİRİŞİ TAB === */}
         {activeTab==="groups" && simResults && (
@@ -1259,29 +1551,20 @@ export default function App() {
 
         {/* === MATRIX TAB === */}
         {activeTab==="matrix" && simResults && (() => {
-          // Çok kademeli sıralama: şampiyon → final → YF → ÇF → S16 → S32
-          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a,b) => {
-            const ta = simResults.teams[a] || {}, tb = simResults.teams[b] || {};
-            return (tb.champion??0)-(ta.champion??0)
-              || (tb.f??0)-(ta.f??0)
-              || (tb.sf??0)-(ta.sf??0)
-              || (tb.qf??0)-(ta.qf??0)
-              || (tb.r16??0)-(ta.r16??0)
-              || (tb.r32??0)-(ta.r32??0);
-          });
+          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a,b)=>(simResults.teams[b]?.champion??0)-(simResults.teams[a]?.champion??0));
           const half = Math.ceil(sortedIds.length / 2);
           const leftIds = sortedIds.slice(0, half);
           const rightIds = sortedIds.slice(half);
           const maxChamp = simResults.teams[sortedIds[0]]?.champion ?? 1;
 
-          const thCls = (color) => ({padding:"6px 8px",textAlign:"center",fontWeight:800,fontSize:10,color,letterSpacing:"0.04em",textTransform:"uppercase",whiteSpace:"nowrap",background:"#0a0f1e",borderBottom:"2px solid rgba(255,255,255,0.08)"});
-          const tdCls = (color, bold, eliminated) => ({padding:"4px 8px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:bold?700:600,color:eliminated?"rgba(150,60,60,0.8)":color,fontSize:11,whiteSpace:"nowrap"});
+          const thCls = (color) => ({padding:"7px 8px",textAlign:"center",fontWeight:800,fontSize:10,color,letterSpacing:"0.04em",textTransform:"uppercase",whiteSpace:"nowrap",background:"#0a0f1e",borderBottom:"2px solid rgba(255,255,255,0.08)"});
+          const tdCls = (color, bold) => ({padding:"6px 8px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:bold?700:600,color,fontSize:11.5,whiteSpace:"nowrap"});
 
           const MatrixTable = ({ids, offset}) => (
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead style={{position:"sticky",top:0,zIndex:20}}>
                 <tr>
-                  <th style={{...thCls("rgba(255,255,255,0.5)"),textAlign:"left",padding:"6px 10px",minWidth:130}}>Takım</th>
+                  <th style={{...thCls("rgba(255,255,255,0.5)"),textAlign:"left",padding:"7px 10px",minWidth:130}}>Takım</th>
                   <th style={thCls("#10b981")}>S32</th>
                   <th style={thCls("rgba(255,255,255,0.6)")}>S16</th>
                   <th style={thCls("rgba(255,255,255,0.7)")}>ÇF</th>
@@ -1299,34 +1582,29 @@ export default function App() {
                   const champPct = t.champion ?? 0;
                   const rowIdx = offset + i;
                   const isTop3 = rowIdx < 3;
-                  const isEliminated = champPct === 0 && (t.r32 ?? 0) === 0;
-                  const baseRowBg = isEliminated
-                    ? (i%2===0 ? "rgba(239,68,68,0.07)" : "rgba(239,68,68,0.11)")
-                    : (i%2===0 ? "#ffffff" : "#fafbfc");
-                  const hoverBg = isEliminated ? "rgba(239,68,68,0.15)" : "rgba(16,185,129,0.04)";
                   return (
                     <tr key={id}
-                      style={{borderBottom:"1px solid #f1f5f9",background:baseRowBg,transition:"background 0.12s"}}
-                      onMouseEnter={e=>e.currentTarget.style.background=hoverBg}
-                      onMouseLeave={e=>e.currentTarget.style.background=baseRowBg}>
-                      <td style={{padding:"4px 10px"}}>
+                      style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"#ffffff":"#fafbfc",transition:"background 0.12s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,0.04)"}
+                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#ffffff":"#fafbfc"}>
+                      <td style={{padding:"6px 10px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:7}}>
-                          <span style={{fontSize:10,fontFamily:"monospace",color:isEliminated?"rgba(180,80,80,0.6)":"#94a3b8",fontWeight:700,minWidth:18,textAlign:"right"}}>{rowIdx+1}</span>
-                          <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",boxShadow:"0 1px 2px rgba(0,0,0,0.1)",flexShrink:0,opacity:isEliminated?0.45:1}} alt="" />
-                          <span style={{fontWeight:700,color:isEliminated?"rgba(150,60,60,0.7)":"#0f172a",fontSize:12,whiteSpace:"nowrap"}}>{INITIAL_TEAMS[id]?.name}</span>
+                          <span style={{fontSize:10,fontFamily:"monospace",color:"#94a3b8",fontWeight:700,minWidth:18,textAlign:"right"}}>{rowIdx+1}</span>
+                          <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",boxShadow:"0 1px 2px rgba(0,0,0,0.1)",flexShrink:0}} alt="" />
+                          <span style={{fontWeight:700,color:"#0f172a",fontSize:12,whiteSpace:"nowrap"}}>{INITIAL_TEAMS[id]?.name}</span>
                         </div>
                       </td>
-                      <td style={tdCls("#059669",true,isEliminated)}>{(t.r32??0).toFixed(1)}%</td>
-                      <td style={tdCls("#374151",false,isEliminated)}>{(t.r16??0).toFixed(1)}%</td>
-                      <td style={tdCls("#374151",false,isEliminated)}>{(t.qf??0).toFixed(1)}%</td>
-                      <td style={tdCls("#0284c7",true,isEliminated)}>{(t.sf??0).toFixed(1)}%</td>
-                      <td style={tdCls("#7c3aed",true,isEliminated)}>{(t.f??0).toFixed(1)}%</td>
-                      <td style={{padding:"4px 8px",background:isEliminated?"rgba(239,68,68,0.04)":"rgba(217,119,6,0.02)"}}>
+                      <td style={tdCls("#059669",true)}>{(t.r32??0).toFixed(1)}%</td>
+                      <td style={tdCls("#374151",false)}>{(t.r16??0).toFixed(1)}%</td>
+                      <td style={tdCls("#374151",false)}>{(t.qf??0).toFixed(1)}%</td>
+                      <td style={tdCls("#0284c7",true)}>{(t.sf??0).toFixed(1)}%</td>
+                      <td style={tdCls("#7c3aed",true)}>{(t.f??0).toFixed(1)}%</td>
+                      <td style={{padding:"6px 8px",background:"rgba(217,119,6,0.02)"}}>
                         <div style={{display:"flex",alignItems:"center",gap:5}}>
-                          <div style={{width:32,height:3,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
-                            <div style={{width:`${Math.min(100,(champPct/maxChamp)*100)}%`,height:"100%",background:isEliminated?"rgba(200,80,80,0.3)":isTop3?"linear-gradient(90deg,#d97706,#f59e0b)":"linear-gradient(90deg,#94a3b8,#cbd5e1)",borderRadius:2}}></div>
+                          <div style={{width:36,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                            <div style={{width:`${Math.min(100,(champPct/maxChamp)*100)}%`,height:"100%",background:isTop3?"linear-gradient(90deg,#d97706,#f59e0b)":"linear-gradient(90deg,#94a3b8,#cbd5e1)",borderRadius:2}}></div>
                           </div>
-                          <span style={{fontFamily:"monospace",fontWeight:900,color:isEliminated?"rgba(150,60,60,0.6)":isTop3?"#b45309":"#374151",fontSize:11.5,minWidth:38,textAlign:"right"}}>{champPct.toFixed(1)}%</span>
+                          <span style={{fontFamily:"monospace",fontWeight:900,color:isTop3?"#b45309":"#374151",fontSize:12,minWidth:38,textAlign:"right"}}>{champPct.toFixed(1)}%</span>
                         </div>
                       </td>
                     </tr>
@@ -1351,10 +1629,6 @@ export default function App() {
                       <span style={{color:"rgba(255,255,255,0.7)",fontWeight:700}}>{k}</span> = {v}
                     </div>
                   ))}
-                  <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:"monospace",display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{width:8,height:8,borderRadius:2,background:"rgba(239,68,68,0.35)",display:"inline-block"}}></span>
-                    Elenmiş
-                  </div>
                 </div>
               </div>
               {/* Dual column tables */}
