@@ -892,8 +892,10 @@ export default function App() {
     const HEADER_H  = 36;
     const MAX_MATCHES = 8;
     const BRACKET_H = MAX_MATCHES * CARD_H + (MAX_MATCHES - 1) * 6; // 6px gap
-    const THIRD_H   = CARD_H + 8;
-    const TOTAL_H   = PAD + HEADER_H + BRACKET_H + 20 + THIRD_H + PAD;
+    const THIRD_LABEL_H = 20;  // "ÜÇÜNCÜLÜK MAÇI" şerit yüksekliği
+    const THIRD_GAP     = 24;  // bracket altından üçüncülük şeridine boşluk
+    const THIRD_H       = THIRD_LABEL_H + CARD_H + PAD; // başlık + maç kartı + alt boşluk
+    const TOTAL_H   = PAD + HEADER_H + 22 + BRACKET_H + THIRD_GAP + THIRD_H;
 
     const canvas = document.createElement("canvas");
     canvas.width  = TOTAL_W * DPR;
@@ -1185,18 +1187,18 @@ export default function App() {
     ctx.fillText(wName, CX + CENTER_W / 2 - 14, champY + 24);
 
     // ── ÜÇÜNCÜLÜK MAÇI ──
-    const thirdY = BRACKET_TOP + BRACKET_H + 16;
+    const thirdY = BRACKET_TOP + BRACKET_H + THIRD_GAP;
     const thirdBlockW = CARD_W * 2 + COL_GAP;
     const thirdX = TOTAL_W / 2 - thirdBlockW / 2;
 
     ctx.fillStyle = "#7c3aed";
-    roundRect(ctx, thirdX, thirdY, thirdBlockW, 18, 6); ctx.fill();
+    roundRect(ctx, thirdX, thirdY, thirdBlockW, THIRD_LABEL_H, 6); ctx.fill();
     ctx.font = "900 8px system-ui";
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("★  ÜÇÜNCÜLÜK MAÇI  ★", thirdX + thirdBlockW / 2, thirdY + 9);
+    ctx.fillText("★  ÜÇÜNCÜLÜK MAÇI  ★", thirdX + thirdBlockW / 2, thirdY + THIRD_LABEL_H / 2);
 
-    drawMatchCard(bracket.thirdPlaceMatch, thirdX, thirdY + 20, knockoutScores);
+    drawMatchCard(bracket.thirdPlaceMatch, thirdX, thirdY + THIRD_LABEL_H + 4, knockoutScores);
 
     // İndir
     const link = document.createElement("a");
