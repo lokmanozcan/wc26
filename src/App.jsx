@@ -611,7 +611,7 @@ export default function App() {
   const groupsPanelRef = useRef(null);
   const bracketPanelRef = useRef(null);
 
-  // ── Görsel indirme — clone yöntemi (scroll bağımsız, piksel mükemmel) ──────
+  // ── Görsel indirme — offscreen clone, Twitter kalitesi ────────────────────
   const loadHtml2Canvas = (cb) => {
     if (window.html2canvas) { cb(); return; }
     const s = document.createElement("script");
@@ -620,125 +620,84 @@ export default function App() {
     document.head.appendChild(s);
   };
 
+  // Elementi sayfadan bağımsız, offscreen wrapper içinde yakalır
+  const captureOffscreen = async (el, scale = 3, expandScrollEl = false) => {
+    // 1. Mevcut tam boyutları al (scroll açılmadan)
+    const W = el.scrollWidth;
+    const H = el.scrollHeight;
+
+    // 2. Klon
+    const clone = el.cloneNode(true);
+
+    // 3. Bracket için scroll wrapper'ı klon içinde aç
+    if (expandScrollEl) {
+      const sw = clone.querySelector(".bracket-scroll-wrapper");
+      if (sw) {
+        sw.style.overflow  = "visible";
+        sw.style.width     = W + "px";
+        sw.style.minWidth  = W + "px";
+        sw.style.maxWidth  = "none";
+      }
+    }
+
+    // 4. Offscreen container — position:absolute, viewport dışı
+    const host = document.createElement("div");
+    Object.assign(host.style, {
+      position:   "absolute",
+      top:        "-99999px",
+      left:       "-99999px",
+      width:      W + "px",
+      height:     H + "px",
+      overflow:   "visible",
+      background: "#ffffff",
+      zIndex:     "-1",
+    });
+    host.appendChild(clone);
+    document.body.appendChild(host);
+
+    let canvas;
+    try {
+      canvas = await window.html2canvas(host, {
+        scale,
+        useCORS:      true,
+        allowTaint:   true,
+        backgroundColor: "#ffffff",
+        logging:      false,
+        imageTimeout: 15000,
+        width:  W,
+        height: H,
+        x: 0,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth:  W,
+        windowHeight: H,
+      });
+    } finally {
+      document.body.removeChild(host);
+    }
+    return canvas;
+  };
+
   const downloadAsImage = (ref, filename) => {
     if (!ref.current) return;
-    const el = ref.current;
-
     loadHtml2Canvas(async () => {
-      // 1) Elementi klonla
-      const clone = el.cloneNode(true);
-
-      // 2) Tam boyut al
-      const fullW = el.scrollWidth;
-      const fullH = el.scrollHeight;
-
-      // 3) Görünmez ama DOM'da olan bir wrapper içine koy
-      const wrapper = document.createElement("div");
-      Object.assign(wrapper.style, {
-        position: "fixed",
-        top: "0",
-        left: "0",
-        width:  fullW + "px",
-        height: fullH + "px",
-        zIndex: "-9999",
-        pointerEvents: "none",
-        overflow: "hidden",
-        background: "#ffffff",
-      });
-      wrapper.appendChild(clone);
-      document.body.appendChild(wrapper);
-
-      try {
-        const canvas = await window.html2canvas(wrapper, {
-          scale: 3,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-          imageTimeout: 0,
-          width:  fullW,
-          height: fullH,
-          x: 0,
-          y: 0,
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth:  fullW,
-          windowHeight: fullH,
-        });
-        const link = document.createElement("a");
-        link.download = filename;
-        link.href = canvas.toDataURL("image/png", 1.0);
-        link.click();
-      } finally {
-        document.body.removeChild(wrapper);
-      }
+      const canvas = await captureOffscreen(ref.current, 3, false);
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = canvas.toDataURL("image/png", 1.0);
+      link.click();
     });
   };
 
   const downloadBracket = () => {
-    const el = bracketPanelRef.current;
-    if (!el) return;
-
-    // Scroll wrapper'ı aç
-    const scrollEl = el.querySelector(".bracket-scroll-wrapper");
-
+    if (!bracketPanelRef.current) return;
     loadHtml2Canvas(async () => {
-      // Tam içerik boyutunu al (scroll açılmadan önce)
-      const innerContent = scrollEl ? scrollEl.firstElementChild : el;
-      const fullW = innerContent ? innerContent.scrollWidth + 32 : el.scrollWidth;
-      const fullH = el.scrollHeight;
-
-      // Clone al
-      const clone = el.cloneNode(true);
-
-      // Clone içindeki scroll wrapper'ı aç
-      const cloneScroll = clone.querySelector(".bracket-scroll-wrapper");
-      if (cloneScroll) {
-        cloneScroll.style.overflow = "visible";
-        cloneScroll.style.width = fullW + "px";
-        cloneScroll.style.minWidth = fullW + "px";
-        cloneScroll.style.maxWidth = "none";
-      }
-
-      const wrapper = document.createElement("div");
-      Object.assign(wrapper.style, {
-        position: "fixed",
-        top: "0",
-        left: "0",
-        width:  fullW + "px",
-        height: fullH + "px",
-        zIndex: "-9999",
-        pointerEvents: "none",
-        overflow: "visible",
-        background: "#ffffff",
-      });
-      wrapper.appendChild(clone);
-      document.body.appendChild(wrapper);
-
-      try {
-        const canvas = await window.html2canvas(wrapper, {
-          scale: 2.5,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-          imageTimeout: 0,
-          width:  fullW,
-          height: fullH,
-          x: 0,
-          y: 0,
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth:  fullW,
-          windowHeight: fullH,
-        });
-        const link = document.createElement("a");
-        link.download = "turnuva_agaci_wc26.png";
-        link.href = canvas.toDataURL("image/png", 1.0);
-        link.click();
-      } finally {
-        document.body.removeChild(wrapper);
-      }
+      const canvas = await captureOffscreen(bracketPanelRef.current, 2.5, true);
+      const link = document.createElement("a");
+      link.download = "turnuva_agaci_wc26.png";
+      link.href = canvas.toDataURL("image/png", 1.0);
+      link.click();
     });
   };
 
@@ -1255,8 +1214,9 @@ export default function App() {
                     const tData = liveTableData.thirds.find(x => x.id === id) || { pts: 0, gd: 0 };
                     const leftAccent = isQ ? "#f97316" : "transparent";
                     const rowBg = isQ ? "rgba(249,115,22,0.09)" : "transparent";
-                    const nameColor = isQ ? "#9a3412" : "#94a3b8";
+                    const nameColor = isQ ? "#9a3412" : "#374151";
                     const gdColor = tData.gd > 0 ? "#1d4ed8" : tData.gd < 0 ? "#dc2626" : "#94a3b8";
+                    const gdColorFinal = isQ ? gdColor : "#94a3b8";
                     return (
                       <div key={id} style={{
                         display:"flex", alignItems:"center",
@@ -1266,19 +1226,18 @@ export default function App() {
                         paddingLeft: 5, paddingRight: 4,
                         paddingTop: 3, paddingBottom: 3,
                         minHeight: 26,
-                        opacity: isQ ? 1 : 0.5,
                       }}>
-                        <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?"#ea580c":"#cbd5e1",width:16,flexShrink:0,textAlign:"center"}}>{index+1}</span>
+                        <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?"#ea580c":"#94a3b8",width:16,flexShrink:0,textAlign:"center"}}>{index+1}</span>
                         <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
                         <span style={{flex:1,fontSize:11.5,fontWeight: isQ?700:500,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>
-                          {INITIAL_TEAMS[id]?.name} <span style={{fontSize:9,color: isQ?"#f97316":"#e2e8f0",fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
+                          {INITIAL_TEAMS[id]?.name} <span style={{fontSize:9,color: isQ?"#f97316":"#94a3b8",fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
                         </span>
                         {/* AV */}
-                        <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?gdColor:"#cbd5e1",flexShrink:0}}>
+                        <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColorFinal,flexShrink:0}}>
                           {tData.gd > 0 ? `+${tData.gd}` : tData.gd}
                         </span>
                         {/* P */}
-                        <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:900,color: isQ?"#ea580c":"#cbd5e1",flexShrink:0}}>
+                        <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:900,color: isQ?"#ea580c":"#374151",flexShrink:0}}>
                           {tData.pts}
                         </span>
                       </div>
