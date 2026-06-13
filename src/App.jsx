@@ -1366,14 +1366,20 @@ export default function App() {
       if (!idA || !idB) return;
       [[idA, idB, posA], [idB, idA, posB]].forEach(([me, opp, myPos]) => {
         if (!encounterStats[me][opp]) {
-          encounterStats[me][opp] = { r32:0, r16:0, qf:0, sf:0, f:0, total:0, pos1:0, pos2:0, pos3:0 };
+          encounterStats[me][opp] = {
+            r32:0, r16:0, qf:0, sf:0, f:0, total:0,
+            pos1:0, pos2:0, pos3:0,
+            pos1_r32:0, pos1_r16:0, pos1_qf:0, pos1_sf:0, pos1_f:0,
+            pos2_r32:0, pos2_r16:0, pos2_qf:0, pos2_sf:0, pos2_f:0,
+            pos3_r32:0, pos3_r16:0, pos3_qf:0, pos3_sf:0, pos3_f:0,
+          };
         }
         const e = encounterStats[me][opp];
         e[round]++;
         e.total++;
-        if (myPos === 1) e.pos1++;
-        else if (myPos === 2) e.pos2++;
-        else if (myPos === 3) e.pos3++;
+        if (myPos === 1) { e.pos1++; e[`pos1_${round}`]++; }
+        else if (myPos === 2) { e.pos2++; e[`pos2_${round}`]++; }
+        else if (myPos === 3) { e.pos3++; e[`pos3_${round}`]++; }
       });
     };
 
@@ -2060,12 +2066,15 @@ export default function App() {
 
                 // ── DOĞRU NORMALİZASYON ──────────────────────────────────────────
                 // Her filtre kombinasyonu için: önce ham sayıları topla, sonra toplama böl → %100
+                const posKey = encounterPosFilter !== "all"
+                  ? {"1st":"pos1","2nd":"pos2","3rd":"pos3"}[encounterPosFilter]
+                  : null;
                 const getRawCount = (e) => {
-                  // Pozisyon filtresi aktifse sadece o pozisyondaki karşılaşmaları al
-                  if (encounterPosFilter === "1st") return e.pos1 || 0;
-                  if (encounterPosFilter === "2nd") return e.pos2 || 0;
-                  if (encounterPosFilter === "3rd") return e.pos3 || 0;
-                  // Tüm pozisyonlar — tur filtresi uygula
+                  // Hem pozisyon hem tur filtresi seçiliyse kombine anahtar kullan
+                  if (posKey && encounterRoundFilter !== "all") return e[`${posKey}_${encounterRoundFilter}`] || 0;
+                  // Sadece pozisyon filtresi
+                  if (posKey) return e[posKey] || 0;
+                  // Sadece tur filtresi
                   if (encounterRoundFilter === "r32") return e.r32 || 0;
                   if (encounterRoundFilter === "r16") return e.r16 || 0;
                   if (encounterRoundFilter === "qf")  return e.qf  || 0;
@@ -2111,10 +2120,14 @@ export default function App() {
 
                 // Aktif filtrenin açıklaması
                 const filterDesc = () => {
-                  if (encounterPosFilter === "1st") return `${INITIAL_TEAMS[encTeamId]?.name} grubu 1. bitirdiğinde eşleştiği rakipler (normalize, toplam %100)`;
-                  if (encounterPosFilter === "2nd") return `${INITIAL_TEAMS[encTeamId]?.name} grubu 2. bitirdiğinde eşleştiği rakipler (normalize, toplam %100)`;
-                  if (encounterPosFilter === "3rd") return `${INITIAL_TEAMS[encTeamId]?.name} grubu 3. bitirdiğinde eşleştiği rakipler (normalize, toplam %100)`;
-                  if (encounterRoundFilter !== "all") return `${roundLabels[encounterRoundFilter]} turunda eşleşilen rakipler (normalize, toplam %100)`;
+                  const posLabel = {"1st":"1. bitirdiğinde","2nd":"2. bitirdiğinde","3rd":"3. bitirdiğinde"}[encounterPosFilter];
+                  const roundLabel = roundLabels[encounterRoundFilter];
+                  if (encounterPosFilter !== "all" && encounterRoundFilter !== "all")
+                    return `${INITIAL_TEAMS[encTeamId]?.name} grubu ${posLabel} ${roundLabel} turunda eşleştiği rakipler (normalize, toplam %100)`;
+                  if (encounterPosFilter !== "all")
+                    return `${INITIAL_TEAMS[encTeamId]?.name} grubu ${posLabel} eşleştiği rakipler (normalize, toplam %100)`;
+                  if (encounterRoundFilter !== "all")
+                    return `${roundLabel} turunda eşleşilen rakipler (normalize, toplam %100)`;
                   return "Turnuva boyunca tüm turlardaki karşılaşmalar (normalize, toplam %100)";
                 };
 
@@ -2143,20 +2156,18 @@ export default function App() {
                     <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:7,alignItems:"center"}}>
                       <span style={{fontSize:9.5,fontWeight:700,color:"#94a3b8",fontFamily:"monospace",width:62,flexShrink:0}}>POZİSYON:</span>
                       {[["all","Tüm Pozisyonlar"],["1st","1. Bitirince"],["2nd","2. Bitirince"],["3rd","3. Bitirince"]].map(([v,lbl])=>(
-                        <button key={v} onClick={()=>{setEncounterPosFilter(v);if(v!=="all")setEncounterRoundFilter("all");}}
+                        <button key={v} onClick={()=>setEncounterPosFilter(v)}
                           style={fbtn(encounterPosFilter===v,"#059669")}>{lbl}</button>
                       ))}
                     </div>
 
-                    {/* Tur filtresi — sadece "Tüm Pozisyonlar"da aktif */}
+                    {/* Tur filtresi — pozisyon filtresiyle kombine çalışır */}
                     <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
                       <span style={{fontSize:9.5,fontWeight:700,color:"#94a3b8",fontFamily:"monospace",width:62,flexShrink:0}}>TUR:</span>
                       {[["all","Tüm Turlar"],["r32","Son 32"],["r16","Son 16"],["qf","Çeyrek F."],["sf","Yarı F."],["f","Final"]].map(([v,lbl])=>(
                         <button key={v}
-                          onClick={()=>{ if(encounterPosFilter==="all") setEncounterRoundFilter(v); }}
-                          style={{...fbtn(encounterRoundFilter===v&&encounterPosFilter==="all","#0284c7"),
-                            opacity:encounterPosFilter!=="all"?0.38:1,
-                            cursor:encounterPosFilter!=="all"?"not-allowed":"pointer"}}>
+                          onClick={()=>setEncounterRoundFilter(v)}
+                          style={fbtn(encounterRoundFilter===v,"#0284c7")}>
                           {lbl}
                         </button>
                       ))}
@@ -2225,7 +2236,7 @@ export default function App() {
                       <span>✓ Toplam: {opponents.reduce((s,o)=>s+o.pct,0).toFixed(1)}% (normalize)</span>
                       <span>· 10.000× Monte Carlo</span>
                       {encounterPosFilter!=="all"&&<span>· {{"1st":"Grup 1.si","2nd":"Grup 2.si","3rd":"Grup 3.sü"}[encounterPosFilter]} olduğu senaryolar</span>}
-                      {encounterRoundFilter!=="all"&&encounterPosFilter==="all"&&<span>· {roundLabels[encounterRoundFilter]} turu</span>}
+                      {encounterRoundFilter!=="all"&&<span>· {roundLabels[encounterRoundFilter]} turu</span>}
                     </div>
                   </div>
                 );
