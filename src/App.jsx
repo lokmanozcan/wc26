@@ -603,7 +603,8 @@ export default function App() {
     Object.fromEntries(Object.entries(INITIAL_TEAMS).map(([k,v]) => [k, v.elo]))
   );
 
-  // --- Hesaplanan / geçici state'ler (DB'ye kaydedilmez) ---
+  // --- Simülasyon önbelleği — DB'ye kaydedilir, sayfa yenilemede tekrar çalışmaz ---
+  const [simCache, setSimCache] = usePersistentState("simCache", { key: null, results: null });
   const [simResults, setSimResults] = useState(null);
   const [singleDisplayScores, setSingleDisplayScores] = useState({});
   const [liveTableData, setLiveTableData] = useState({ groups: {}, thirds: [] });
@@ -1320,13 +1321,29 @@ export default function App() {
     setOfficialOnlyTableData({ groups: groups2, thirds: sortedThirds2 });
   }, [officialScores]);
 
-  // Monte Carlo tetikleyici
+  // Monte Carlo tetikleyici — officialScores veya ELO değişince çalışır,
+  // aynı girdiyle sayfa yenilenirse DB'deki cache'i kullanır (simülasyon çalışmaz)
   useEffect(() => {
+    const cacheKey = JSON.stringify({ officialScores, customElo });
+
+    // 1) DB'deki cache aynı key ile eşleşiyorsa — doğrudan kullan
+    if (simCache && simCache.key === cacheKey && simCache.results) {
+      setSimResults(simCache.results);
+      if (simCache.results.displayScores) {
+        setSingleDisplayScores(simCache.results.displayScores);
+      }
+      return;
+    }
+
+    // 2) Girdi değişti veya cache yok — yeni simülasyon çalıştır
     const results = runAdvancedSimulation(activeTeams, officialScores);
+    // DB'ye kaydet (bir sonraki sayfa açılışında bu sonuç kullanılır)
+    setSimCache({ key: cacheKey, results });
     setSimResults(results);
     if (results && results.displayScores) {
       setSingleDisplayScores(results.displayScores);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [officialScores, customElo]);
 
   const handleScoreChange = (fixtureId, side, value) => {
@@ -1539,11 +1556,12 @@ export default function App() {
       }
       const mKey = [idA, idB].sort().join("_vs_");
       const mh = simResults.matchups[mKey];
-      let pA = mh && mh.total > 0 ? Math.round((mh[idA] / mh.total) * 100) : Math.round(getWinProbability(activeTeams[idA]?.elo || 1600, activeTeams[idB]?.elo || 1600) * 100);
-      // Bracket path'ten bu maçın sim=0 kazananını al
-      const bp = simResults.bracketPath || {};
-      const pathWinner = bp[`r16_${mKey}`] ?? bp[`qf_${mKey}`] ?? bp[`sf_${mKey}`] ?? bp[`f_${mKey}`];
-      const winner = pathWinner || (pA >= 50 ? idA : idB);
+      // Monte Carlo olasılığı — hesaplanamazsa ELO'dan üret
+      const pA = mh && mh.total > 0
+        ? Math.round((mh[idA] / mh.total) * 100)
+        : Math.round(getWinProbability(activeTeams[idA]?.elo || 1600, activeTeams[idB]?.elo || 1600) * 100);
+      // Deterministik kazanan: olasılığı %50 veya üzerinde olan takım geçer
+      const winner = pA >= 50 ? idA : idB;
       return { idA, idB, pA, pB: 100 - pA, winner, loser: winner === idA ? idB : idA };
     };
 
