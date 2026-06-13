@@ -607,37 +607,84 @@ export default function App() {
   const [simResults, setSimResults] = useState(null);
   const [singleDisplayScores, setSingleDisplayScores] = useState({});
   const [liveTableData, setLiveTableData] = useState({ groups: {}, thirds: [] });
+  const [officialOnlyTableData, setOfficialOnlyTableData] = useState({ groups: {}, thirds: [] });
   const groupsPanelRef = useRef(null);
   const bracketPanelRef = useRef(null);
 
   // Yüksek çözünürlüklü görsel indirme yardımcısı
   const downloadAsImage = async (ref, filename, scale=3) => {
     if(!ref.current) return;
-    try {
-      const html2canvas = (await import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js")).default;
-      const canvas = await html2canvas(ref.current, {
-        scale, useCORS:true, allowTaint:true, backgroundColor:"#ffffff",
-        logging:false, imageTimeout:0
-      });
+    const el = ref.current;
+    const rect = el.getBoundingClientRect();
+    const opts = {
+      scale,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      imageTimeout: 0,
+      width: rect.width,
+      height: rect.height,
+      windowWidth: rect.width,
+      windowHeight: rect.height,
+      x: 0,
+      y: 0,
+      scrollX: 0,
+      scrollY: 0,
+      foreignObjectRendering: false,
+    };
+    const doDownload = (canvas) => {
       const link = document.createElement("a");
       link.download = filename;
       link.href = canvas.toDataURL("image/png", 1.0);
       link.click();
-    } catch(e) {
-      // fallback: script tag yükle
-      const script = document.createElement("script");
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-      script.onload = async () => {
-        const canvas = await window.html2canvas(ref.current, {
-          scale, useCORS:true, allowTaint:true, backgroundColor:"#ffffff", logging:false
-        });
-        const link = document.createElement("a");
-        link.download = filename;
-        link.href = canvas.toDataURL("image/png", 1.0);
-        link.click();
-      };
-      document.head.appendChild(script);
+    };
+    if(window.html2canvas) {
+      doDownload(await window.html2canvas(el, opts));
+      return;
     }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    script.onload = async () => { doDownload(await window.html2canvas(el, opts)); };
+    document.head.appendChild(script);
+  };
+
+  const downloadBracket = async () => {
+    const el = bracketPanelRef.current;
+    if(!el) return;
+    const scrollEl = el.querySelector(".bracket-scroll-wrapper");
+    const innerEl = scrollEl ? scrollEl.firstElementChild : el;
+    // Temporarily expand for full capture
+    const prevOverflow = scrollEl ? scrollEl.style.overflow : "";
+    if(scrollEl) scrollEl.style.overflow = "visible";
+    const fullW = innerEl ? innerEl.scrollWidth + 28 : el.scrollWidth;
+    const fullH = el.scrollHeight;
+    const opts = {
+      scale: 2.5,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      imageTimeout: 0,
+      width: fullW,
+      height: fullH,
+      windowWidth: fullW,
+      windowHeight: fullH,
+      scrollX: 0,
+      scrollY: 0,
+    };
+    const doDownload = (canvas) => {
+      if(scrollEl) scrollEl.style.overflow = prevOverflow;
+      const link = document.createElement("a");
+      link.download = "turnuva_agaci_wc26.png";
+      link.href = canvas.toDataURL("image/png", 1.0);
+      link.click();
+    };
+    if(window.html2canvas) { doDownload(await window.html2canvas(el, opts)); return; }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    script.onload = async () => { doDownload(await window.html2canvas(el, opts)); };
+    document.head.appendChild(script);
   };
 
   // --- ELO otomatik güncelleme (saatte bir) ---
@@ -720,6 +767,37 @@ export default function App() {
 
     setLiveTableData({ groups: groupsOutput, thirds: sortedThirds });
   }, [userScores, officialScores, singleDisplayScores, simResults]);
+
+  // SADECE RESMİ ONAYLANAN SKORLARDAN OLUŞAN TABLO (Anlık Puan Durumu)
+  useEffect(() => {
+    const points2 = {}; const gd2 = {}; const gf2 = {};
+    Object.keys(activeTeams).forEach(id => { points2[id] = 0; gd2[id] = 0; gf2[id] = 0; });
+    const fixtures2 = generateAllFixtures();
+    fixtures2.forEach(f => {
+      const sc = officialScores[f.id];
+      if (!sc || sc.home === "" || sc.away === "") return;
+      const hG = parseInt(sc.home) || 0;
+      const aG = parseInt(sc.away) || 0;
+      gf2[f.home] += hG; gf2[f.away] += aG;
+      gd2[f.home] += (hG - aG); gd2[f.away] += (aG - hG);
+      if (hG > aG) points2[f.home] += 3;
+      else if (aG > hG) points2[f.away] += 3;
+      else { points2[f.home] += 1; points2[f.away] += 1; }
+    });
+    const groups2 = {};
+    const thirds2 = [];
+    Object.entries(GROUPS_CONFIG).forEach(([gName, gTeams]) => {
+      const sorted2 = [...gTeams].sort((a, b) =>
+        points2[b] - points2[a] || gd2[b] - gd2[a] || gf2[b] - gf2[a] || activeTeams[b].elo - activeTeams[a].elo
+      );
+      groups2[gName] = sorted2.map(id => ({ id, pts: points2[id], gd: gd2[id], gf: gf2[id] }));
+      thirds2.push({ id: sorted2[2], group: gName, pts: points2[sorted2[2]], gd: gd2[sorted2[2]], gf: gf2[sorted2[2]] });
+    });
+    const sortedThirds2 = thirds2.sort((a, b) =>
+      b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || activeTeams[b.id].elo - activeTeams[a.id].elo
+    );
+    setOfficialOnlyTableData({ groups: groups2, thirds: sortedThirds2 });
+  }, [officialScores]);
 
   // Monte Carlo tetikleyici
   useEffect(() => {
@@ -992,7 +1070,7 @@ export default function App() {
                   {/* Bayrak */}
                   <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
                   {/* İsim */}
-                  <span style={{flex:1,fontSize:12,fontWeight,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>{INITIAL_TEAMS[id]?.name}</span>
+                  <span style={{flex:1,fontSize:12,fontWeight,color:nameColor,whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>{INITIAL_TEAMS[id]?.name}</span>
                   {/* AV */}
                   <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColor,flexShrink:0}}>
                     {item.gd > 0 ? `+${item.gd}` : item.gd}
@@ -1090,7 +1168,7 @@ export default function App() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 GRUPLAR + 3.LER
               </button>
-              <button onClick={()=>downloadAsImage(bracketPanelRef,"turnuva_agaci_wc26.png",2.5)}
+              <button onClick={()=>downloadBracket()}
                 style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:"linear-gradient(135deg,#f59e0b,#d97706)",border:"none",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",boxShadow:"0 2px 8px rgba(217,119,6,0.35)",letterSpacing:"0.04em",fontFamily:"monospace"}}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 TURNUVA AĞACI
@@ -1138,8 +1216,7 @@ export default function App() {
                         <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?"#ea580c":"#cbd5e1",width:16,flexShrink:0,textAlign:"center"}}>{index+1}</span>
                         <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
                         <span style={{flex:1,fontSize:11.5,fontWeight: isQ?700:500,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>
-                          {INITIAL_TEAMS[id]?.name}
-                          <span style={{fontSize:9,color: isQ?"#f97316":"#e2e8f0",marginLeft:3,fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
+                          {INITIAL_TEAMS[id]?.name} <span style={{fontSize:9,color: isQ?"#f97316":"#e2e8f0",fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
                         </span>
                         {/* AV */}
                         <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?gdColor:"#cbd5e1",flexShrink:0}}>
@@ -1173,7 +1250,7 @@ export default function App() {
                 )}
               </div>
               <div className="bracket-scroll-wrapper" style={{padding:"14px",overflowX:"auto"}}>
-                <div style={{width:"100%"}}>
+                <div style={{minWidth:"1200px"}}>
                   <BracketView bracket={bracket} knockoutScores={knockoutScores} />
                 </div>
               </div>
@@ -1191,14 +1268,15 @@ export default function App() {
           const gName = activeGroupTab;
           const gTeams = GROUPS_CONFIG[gName] || [];
           const gFixtures = allGroupFixtures.filter(f => f.group === gName);
-          const liveRows = liveTableData.groups[gName] || [];
-          const qualThirdIds = new Set((liveTableData.thirds||[]).slice(0,8).map(t=>t.id));
+          const liveRows = (officialOnlyTableData.groups[gName]) || [];
+          const qualThirdIds = new Set((officialOnlyTableData.thirds||[]).slice(0,8).map(t=>t.id));
 
-          // Simüle puan durumu (officialScores + singleDisplayScores)
+          // Simüle puan durumu (officialScores > userScores > singleDisplayScores)
           const simPts={}, simGd={}, simGf={};
           gTeams.forEach(id=>{simPts[id]=0;simGd[id]=0;simGf[id]=0;});
           gFixtures.forEach(f=>{
-            const sc = officialScores[f.id] || singleDisplayScores[f.id] || {};
+            const oSc=officialScores[f.id], uSc=userScores[f.id], sSc=singleDisplayScores[f.id];
+            const sc=(oSc&&oSc.home!==""?oSc):(uSc&&uSc.home!==""?uSc):(sSc||{});
             const h=parseInt(sc.home)||0, a=parseInt(sc.away)||0;
             if(h>a){simPts[f.home]+=3;}else if(a>h){simPts[f.away]+=3;}else{simPts[f.home]+=1;simPts[f.away]+=1;}
             simGd[f.home]+=(h-a); simGd[f.away]+=(a-h);
