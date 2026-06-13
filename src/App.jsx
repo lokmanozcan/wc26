@@ -611,80 +611,92 @@ export default function App() {
   const groupsPanelRef = useRef(null);
   const bracketPanelRef = useRef(null);
 
-  // Yüksek çözünürlüklü görsel indirme yardımcısı
-  const downloadAsImage = async (ref, filename, scale=3) => {
-    if(!ref.current) return;
-    const el = ref.current;
+  // ── Görsel indirme yardımcısı ──────────────────────────────────────────────
+  // html2canvas'ı yükler ve callback çalıştırır
+  const loadHtml2Canvas = (cb) => {
+    if (window.html2canvas) { cb(); return; }
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    s.onload = cb;
+    document.head.appendChild(s);
+  };
+
+  // Bir elementi TAMAMEN (scroll dahil) yakalar
+  const captureElement = async (el, extraOpts = {}) => {
+    // 1) Mevcut scroll pozisyonunu koru
+    const bodyScrollY = window.scrollY;
+    const bodyScrollX = window.scrollX;
+
+    // 2) Elementin sayfa üzerindeki GERÇEK konumu
     const rect = el.getBoundingClientRect();
+    const absTop  = rect.top  + bodyScrollY;
+    const absLeft = rect.left + bodyScrollX;
+
+    // 3) Tam scroll boyutları (içerik kırpılmasın)
+    const fullW = el.scrollWidth;
+    const fullH = el.scrollHeight;
+
     const opts = {
-      scale,
+      scale: 3,
       useCORS: true,
       allowTaint: true,
       backgroundColor: "#ffffff",
       logging: false,
       imageTimeout: 0,
-      width: rect.width,
-      height: rect.height,
-      windowWidth: rect.width,
-      windowHeight: rect.height,
-      x: 0,
-      y: 0,
-      scrollX: 0,
-      scrollY: 0,
-      foreignObjectRendering: false,
+      // Hangi alanı çizeceğimizi kesin belirt
+      x: absLeft,
+      y: absTop,
+      width: fullW,
+      height: fullH,
+      scrollX: -bodyScrollX,
+      scrollY: -bodyScrollY,
+      windowWidth:  document.documentElement.scrollWidth,
+      windowHeight: document.documentElement.scrollHeight,
+      ...extraOpts,
     };
-    const doDownload = (canvas) => {
+
+    return await window.html2canvas(el, opts);
+  };
+
+  const downloadAsImage = (ref, filename) => {
+    if (!ref.current) return;
+    const el = ref.current;
+    loadHtml2Canvas(async () => {
+      const canvas = await captureElement(el);
       const link = document.createElement("a");
       link.download = filename;
       link.href = canvas.toDataURL("image/png", 1.0);
       link.click();
-    };
-    if(window.html2canvas) {
-      doDownload(await window.html2canvas(el, opts));
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-    script.onload = async () => { doDownload(await window.html2canvas(el, opts)); };
-    document.head.appendChild(script);
+    });
   };
 
-  const downloadBracket = async () => {
+  const downloadBracket = () => {
     const el = bracketPanelRef.current;
-    if(!el) return;
+    if (!el) return;
+
+    // Bracket'in scroll wrapper'ını bul ve geçici olarak aç
     const scrollEl = el.querySelector(".bracket-scroll-wrapper");
-    const innerEl = scrollEl ? scrollEl.firstElementChild : el;
-    // Temporarily expand for full capture
-    const prevOverflow = scrollEl ? scrollEl.style.overflow : "";
-    if(scrollEl) scrollEl.style.overflow = "visible";
-    const fullW = innerEl ? innerEl.scrollWidth + 28 : el.scrollWidth;
-    const fullH = el.scrollHeight;
-    const opts = {
-      scale: 2.5,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      imageTimeout: 0,
-      width: fullW,
-      height: fullH,
-      windowWidth: fullW,
-      windowHeight: fullH,
-      scrollX: 0,
-      scrollY: 0,
-    };
-    const doDownload = (canvas) => {
-      if(scrollEl) scrollEl.style.overflow = prevOverflow;
-      const link = document.createElement("a");
-      link.download = "turnuva_agaci_wc26.png";
-      link.href = canvas.toDataURL("image/png", 1.0);
-      link.click();
-    };
-    if(window.html2canvas) { doDownload(await window.html2canvas(el, opts)); return; }
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-    script.onload = async () => { doDownload(await window.html2canvas(el, opts)); };
-    document.head.appendChild(script);
+    const prevStyle = scrollEl ? scrollEl.getAttribute("style") || "" : null;
+
+    if (scrollEl) {
+      scrollEl.style.overflow  = "visible";
+      scrollEl.style.maxWidth  = "none";
+      scrollEl.style.minWidth  = scrollEl.scrollWidth + "px";
+    }
+
+    loadHtml2Canvas(async () => {
+      try {
+        const canvas = await captureElement(el, { scale: 2.5 });
+        const link = document.createElement("a");
+        link.download = "turnuva_agaci_wc26.png";
+        link.href = canvas.toDataURL("image/png", 1.0);
+        link.click();
+      } finally {
+        if (scrollEl) {
+          scrollEl.setAttribute("style", prevStyle);
+        }
+      }
+    });
   };
 
   // --- ELO otomatik güncelleme (saatte bir) ---
@@ -1163,7 +1175,7 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             {/* İndirme Butonları */}
             <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
-              <button onClick={()=>downloadAsImage(groupsPanelRef,"gruplar_ve_3ler_wc26.png",3)}
+              <button onClick={()=>downloadAsImage(groupsPanelRef,"gruplar_ve_3ler_wc26.png")}
                 style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:"linear-gradient(135deg,#0ea5e9,#0284c7)",border:"none",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",boxShadow:"0 2px 8px rgba(2,132,199,0.35)",letterSpacing:"0.04em",fontFamily:"monospace"}}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 GRUPLAR + 3.LER
