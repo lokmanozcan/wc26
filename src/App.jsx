@@ -1357,6 +1357,7 @@ export default function App() {
     const encounterStats = {};
     const firstSimDisplayScores = {};
     const firstSimBracketPath = {}; // sim=0'daki eleme turu sonuçları
+    const firstSimGroupRankings = {}; // sim=0'daki grup sıralamaları
     Object.keys(teams).forEach(id => {
       stats[id] = { id, r32:0,r16:0,qf:0,sf:0,f:0,champion:0,thirdPlaceChamp:0,g1:0,g2:0,g3:0,g4:0 };
       encounterStats[id] = {};
@@ -1422,10 +1423,14 @@ export default function App() {
         if(stats[sorted[1]])stats[sorted[1]].g2++;
         if(stats[sorted[2]])stats[sorted[2]].g3++;
         if(stats[sorted[3]])stats[sorted[3]].g4++;
+        // sim=0'da grup sıralamalarını kaydet
+        if (sim === 0) firstSimGroupRankings[gName] = [...sorted];
       });
 
       const bestThirds = [...thirds].sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || b.elo - a.elo);
-      const qualifiedThirds = bestThirds.slice(0,8); // Değişkeni burada tanımlıyoruz
+      const qualifiedThirds = bestThirds.slice(0,8);
+      // sim=0'da 3.'leri kaydet
+      if (sim === 0) firstSimGroupRankings["_qualifiedThirds"] = qualifiedThirds.map(t=>({...t}));
       
       // Şimdi qualifiedThirds artık erişilebilir durumda
       const qualifiedLetters = qualifiedThirds.map(t => t.group).sort().join("");
@@ -1527,16 +1532,42 @@ export default function App() {
       stats[id].g3=(stats[id].g3/s)*100; stats[id].g4=(stats[id].g4/s)*100;
     });
 
-    return {teams:stats, matchups:matchupStats, encounters:encounterStats, displayScores:firstSimDisplayScores, bracketPath:firstSimBracketPath};
+    return {teams:stats, matchups:matchupStats, encounters:encounterStats, displayScores:firstSimDisplayScores, bracketPath:firstSimBracketPath, groupRankings:firstSimGroupRankings};
   }
 
   const buildLiveBracket = () => {
     if (!simResults || !liveTableData.groups || Object.keys(liveTableData.groups).length === 0) return null;
-    
-    const getTop = (g) => (liveTableData.groups[g] || []).map(t => t.id);
-    
+
+    const gr = simResults.groupRankings || {};
+
+    // Her grup için: resmi skor girilmişse liveTableData, yoksa sim=0 sıralaması kullan
+    const getTop = (g) => {
+      const live = (liveTableData.groups[g] || []).map(t => t.id);
+      // Bu gruptaki herhangi bir maçta resmi skor var mı?
+      const fixtures = generateAllFixtures().filter(f => f.group === g);
+      const hasOfficial = fixtures.some(f => {
+        const sc = officialScores[f.id];
+        return sc && sc.home !== "" && sc.away !== "";
+      });
+      return hasOfficial ? live : (gr[g] || live);
+    };
+
+    // 3.'ler için sim=0'dan al; resmi skorlar varsa liveTableData'dan
+    const simQT = gr["_qualifiedThirds"] || [];
+    const hasAnyOfficial = Object.values(officialScores).some(sc => sc && sc.home !== "" && sc.away !== "");
+
     const allThirds = Object.keys(GROUPS_CONFIG).map(g => getTop(g)[2]);
+
+    // Sıralama: resmi skor varsa liveTableData puan/gol ortalamasına göre, yoksa sim=0 qualified sıralamasına göre
+    const simQTIds = simQT.map(t => t.id);
     const sortedThirds = [...allThirds].sort((a, b) => {
+      if (!hasAnyOfficial) {
+        // Sim=0 sıralamasını kullan: qualified olanlar önce, sonra sim sırasına göre
+        const ai = simQTIds.indexOf(a), bi = simQTIds.indexOf(b);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+      }
       const tB = liveTableData.thirds.find(x => x.id === b) || { pts: 0, gd: 0 };
       const tA = liveTableData.thirds.find(x => x.id === a) || { pts: 0, gd: 0 };
       return tB.pts - tA.pts || tB.gd - tA.gd || activeTeams[b].elo - activeTeams[a].elo;
@@ -1562,10 +1593,7 @@ export default function App() {
       const mh = simResults.matchups[mKey];
       let pA = mh && mh.total > 0 ? Math.round((mh[idA] / mh.total) * 100) : Math.round(getWinProbability(activeTeams[idA]?.elo || 1600, activeTeams[idB]?.elo || 1600) * 100);
       // Bracket path'ten bu maçın sim=0 kazananını al
-      const bp = simResults.bracketPath || {};
-      const pathWinner = bp[`r16_${mKey}`] ?? bp[`qf_${mKey}`] ?? bp[`sf_${mKey}`] ?? bp[`f_${mKey}`];
-      const winner = pathWinner || (pA >= 50 ? idA : idB);
-      return { idA, idB, pA, pB: 100 - pA, winner, loser: winner === idA ? idB : idA };
+      return { idA, idB, pA, pB: 100 - pA, winner: pA >= 50 ? idA : idB, loser: pA >= 50 ? idB : idA };
     };
 
     const left_r32 = [
