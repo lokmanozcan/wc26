@@ -185,7 +185,7 @@ function simulateEloWeightedScore(eloHome, eloAway) {
 }
 
 // === MATCH CARD ===
-function MatchCard({ m, score }) {
+function MatchCard({ m, score, officialOnly = false }) {
   const flagA = INITIAL_TEAMS[m?.idA]?.iso;
   const flagB = INITIAL_TEAMS[m?.idB]?.iso;
   const nameA = INITIAL_TEAMS[m?.idA]?.name || "---";
@@ -193,7 +193,7 @@ function MatchCard({ m, score }) {
 
   const hasScore = score && score.home !== "" && score.away !== "" && score.home !== undefined && score.away !== undefined;
   const sw = hasScore ? scoreWinner(score) : null;
-  const actualWinner = hasScore ? (sw === "home" || sw === "draw" ? m?.idA : m?.idB) : m?.winner;
+  const actualWinner = hasScore ? (sw === "home" || sw === "draw" ? m?.idA : m?.idB) : (officialOnly ? null : m?.winner);
   const isWinnerA = actualWinner === m?.idA;
   const isWinnerB = actualWinner === m?.idB;
 
@@ -210,6 +210,8 @@ function MatchCard({ m, score }) {
           <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerA ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center", flexShrink:0 }}>
             {score.home}
           </span>
+        ) : officialOnly ? (
+          <span style={{ fontFamily:"monospace", fontWeight:700, fontSize:11, color:"#cbd5e1", minWidth:14, textAlign:"center", flexShrink:0 }}>–</span>
         ) : (
           <span className="pct-badge" style={{ color: isWinnerA ? "#047857" : "#64748b", flexShrink:0 }}>{m?.pA ?? 50}%</span>
         )}
@@ -223,6 +225,8 @@ function MatchCard({ m, score }) {
           <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerB ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center", flexShrink:0 }}>
             {score.away}
           </span>
+        ) : officialOnly ? (
+          <span style={{ fontFamily:"monospace", fontWeight:700, fontSize:11, color:"#cbd5e1", minWidth:14, textAlign:"center", flexShrink:0 }}>–</span>
         ) : (
           <span className="pct-badge" style={{ color: isWinnerB ? "#047857" : "#64748b", flexShrink:0 }}>{m?.pB ?? 50}%</span>
         )}
@@ -235,7 +239,7 @@ function MatchCard({ m, score }) {
 }
 
 // === LIVE BRACKET ===
-function BracketView({ bracket, knockoutScores }) {
+function BracketView({ bracket, knockoutScores, officialOnly = false }) {
   const containerRef = useRef(null);
   const [tick, setTick] = useState(0);
 
@@ -330,23 +334,23 @@ function BracketView({ bracket, knockoutScores }) {
         <div ref={lR32Ref} style={colStyle("space-around")}>
           {bracket.left_r32.map((m,i) => {
             const sc = getOrientedScore(m, getScore(m));
-            return <MatchCard key={i} m={m} score={sc} />;
+            return <MatchCard key={i} m={m} score={sc} officialOnly={officialOnly} />;
           })}
         </div>
         <div ref={lR16Ref} style={colStyle("space-around")}>
           {bracket.left_r16.map((m,i) => {
             const sc = getOrientedScore(m, getScore(m));
-            return <div key={i} style={{ display:"flex", alignItems:"center", flex:1 }}><MatchCard m={m} score={sc} /></div>;
+            return <div key={i} style={{ display:"flex", alignItems:"center", flex:1 }}><MatchCard m={m} score={sc} officialOnly={officialOnly} /></div>;
           })}
         </div>
         <div ref={lQFRef} style={colStyle("space-around")}>
           {bracket.left_qf.map((m,i) => {
             const sc = getOrientedScore(m, getScore(m));
-            return <div key={i} style={{ display:"flex", alignItems:"center", flex:1 }}><MatchCard m={m} score={sc} /></div>;
+            return <div key={i} style={{ display:"flex", alignItems:"center", flex:1 }}><MatchCard m={m} score={sc} officialOnly={officialOnly} /></div>;
           })}
         </div>
         <div ref={lSFRef} style={{ ...colStyle("center"), justifyContent:"center" }}>
-          {(() => { const sc = getOrientedScore(bracket.left_sf, getScore(bracket.left_sf)); return <MatchCard m={bracket.left_sf} score={sc} />; })()}
+          {(() => { const sc = getOrientedScore(bracket.left_sf, getScore(bracket.left_sf)); return <MatchCard m={bracket.left_sf} score={sc} officialOnly={officialOnly} />; })()}
         </div>
 
         {/* CENTER PODIUM — yeniden tasarım */}
@@ -395,11 +399,13 @@ function BracketView({ bracket, knockoutScores }) {
                     {t.isWinner && (
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                     )}
-                    <span style={{fontSize:10,fontFamily:"var(--font-mono)",fontWeight:800,color: t.isWinner?"#fbbf24":"rgba(255,255,255,0.4)",flexShrink:0}}>
-                      {t.p}%
-                    </span>
+                    {!officialOnly && (
+                      <span style={{fontSize:10,fontFamily:"var(--font-mono)",fontWeight:800,color: t.isWinner?"#fbbf24":"rgba(255,255,255,0.4)",flexShrink:0}}>
+                        {t.p}%
+                      </span>
+                    )}
                   </div>
-                  {i === 0 && (
+                  {i === 0 && !officialOnly && (
                     <div style={{
                       width:"100%", height:5, background:"rgba(255,255,255,0.06)",
                       borderRadius:3, overflow:"hidden", display:"flex", margin:"6px 0"
@@ -422,9 +428,11 @@ function BracketView({ bracket, knockoutScores }) {
                 <span style={{fontSize:8.5,fontWeight:900,color:"rgba(251,191,36,0.7)",letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:"var(--font-mono)"}}>DÜNYA ŞAMPİYONU</span>
                 <div style={{display:"flex",alignItems:"center",gap:7}}>
                   <img src={LOGO_URL} style={{width:22,height:22,objectFit:"contain",opacity:0.9}} alt="" />
-                  <img src={getFlagUrl(INITIAL_TEAMS[bracket.finalMatch.winner]?.iso)} style={{width:24,height:17,borderRadius:3,objectFit:"cover",boxShadow:"0 2px 6px rgba(0,0,0,0.35)"}} alt="" />
+                  {bracket.finalMatch.winner && (
+                    <img src={getFlagUrl(INITIAL_TEAMS[bracket.finalMatch.winner]?.iso)} style={{width:24,height:17,borderRadius:3,objectFit:"cover",boxShadow:"0 2px 6px rgba(0,0,0,0.35)"}} alt="" />
+                  )}
                   <span style={{fontSize:13,fontWeight:900,color:"#fbbf24",fontFamily:"var(--font-sans)",letterSpacing:"0.01em"}}>
-                    {INITIAL_TEAMS[bracket.finalMatch.winner]?.name||"---"}
+                    {bracket.finalMatch.winner ? INITIAL_TEAMS[bracket.finalMatch.winner]?.name : "---"}
                   </span>
                 </div>
               </div>
@@ -462,7 +470,9 @@ function BracketView({ bracket, knockoutScores }) {
                     {INITIAL_TEAMS[t.id]?.name||"---"}
                   </span>
                   {t.isWinner && <svg width="10" height="10" viewBox="0 0 24 24" fill="#7c3aed"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>}
-                  <span style={{fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,color: t.isWinner?"#7c3aed":"#94a3b8",flexShrink:0}}>{t.p}%</span>
+                  {!officialOnly && (
+                    <span style={{fontSize:10,fontFamily:"var(--font-mono)",fontWeight:700,color: t.isWinner?"#7c3aed":"#94a3b8",flexShrink:0}}>{t.p}%</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -471,24 +481,24 @@ function BracketView({ bracket, knockoutScores }) {
         </div>
 
         <div ref={rSFRef} style={{ ...colStyle("center"), justifyContent:"center" }}>
-          {(() => { const sc = getOrientedScore(bracket.right_sf, getScore(bracket.right_sf)); return <MatchCard m={bracket.right_sf} score={sc} />; })()}
+          {(() => { const sc = getOrientedScore(bracket.right_sf, getScore(bracket.right_sf)); return <MatchCard m={bracket.right_sf} score={sc} officialOnly={officialOnly} />; })()}
         </div>
         <div ref={rQFRef} style={colStyle("space-around")}>
           {bracket.right_qf.map((m,i) => {
             const sc = getOrientedScore(m, getScore(m));
-            return <div key={i} style={{ display:"flex", alignItems:"center", flex:1 }}><MatchCard m={m} score={sc} /></div>;
+            return <div key={i} style={{ display:"flex", alignItems:"center", flex:1 }}><MatchCard m={m} score={sc} officialOnly={officialOnly} /></div>;
           })}
         </div>
         <div ref={rR16Ref} style={colStyle("space-around")}>
           {bracket.right_r16.map((m,i) => {
             const sc = getOrientedScore(m, getScore(m));
-            return <div key={i} style={{ display:"flex", alignItems:"center", flex:1 }}><MatchCard m={m} score={sc} /></div>;
+            return <div key={i} style={{ display:"flex", alignItems:"center", flex:1 }}><MatchCard m={m} score={sc} officialOnly={officialOnly} /></div>;
           })}
         </div>
         <div ref={rR32Ref} style={colStyle("space-around")}>
           {bracket.right_r32.map((m,i) => {
             const sc = getOrientedScore(m, getScore(m));
-            return <MatchCard key={i} m={m} score={sc} />;
+            return <MatchCard key={i} m={m} score={sc} officialOnly={officialOnly} />;
           })}
         </div>
       </div>
@@ -611,6 +621,8 @@ export default function App() {
   const [officialOnlyTableData, setOfficialOnlyTableData] = useState({ groups: {}, thirds: [] });
   const groupsPanelRef = useRef(null);
   const bracketPanelRef = useRef(null);
+  const liveGroupsPanelRef = useRef(null);
+  const liveBracketPanelRef = useRef(null);
 
   // ── PURE CANVAS RENDERER — html2canvas bağımlılığı yok ───────────────────
   // Bayrak görsellerini önbelleğe alır
@@ -646,7 +658,9 @@ export default function App() {
     ctx.closePath();
   };
 
-  const downloadAsImage = async (ref, filename) => {
+  const downloadAsImage = async (ref, filename, opts = {}) => {
+    const tableData = opts.tableData ?? liveTableData;
+    const bracketData = opts.bracket ?? bracket;
     const DPR = 3; // Twitter için yüksek çözünürlük
 
     // Tüm grup takımlarını ve 3.leri önceden yükle
@@ -682,7 +696,7 @@ export default function App() {
 
     // Grup kartlarını çiz
     const groupNames = Object.keys(GROUPS_CONFIG);
-    const qualifiedThirdIds = new Set((liveTableData.thirds || []).slice(0, 8).map(t => t.id));
+    const qualifiedThirdIds = new Set((tableData.thirds || []).slice(0, 8).map(t => t.id));
 
     for (let gi = 0; gi < groupNames.length; gi++) {
       const gName = groupNames[gi];
@@ -720,7 +734,7 @@ export default function App() {
       ctx.fillRect(cx + CARD_PAD, cy + CARD_HEADER_H - 2, CARD_W - CARD_PAD * 2, 2);
 
       // Takım satırları
-      const sorted = liveTableData.groups[gName] || [];
+      const sorted = tableData.groups[gName] || [];
       for (let ri = 0; ri < 4; ri++) {
         const item = sorted[ri];
         if (!item) continue;
@@ -808,14 +822,14 @@ export default function App() {
     ctx.fillRect(TX + CARD_PAD, TY + CARD_HEADER_H - 2, THIRDS_W - CARD_PAD * 2, 2);
 
     // Satırlar
-    const thirds = bracket?.sortedThirds || [];
-    const qualThirds = new Set(bracket?.qualifiedThirds || []);
+    const thirds = bracketData?.sortedThirds || [];
+    const qualThirds = new Set(bracketData?.qualifiedThirds || []);
     const TROW_H = (TH - CARD_HEADER_H - CARD_PAD) / Math.max(thirds.length, 12);
 
     for (let ti = 0; ti < thirds.length; ti++) {
       const id    = thirds[ti];
       const isQ   = qualThirds.has(id);
-      const tData = (liveTableData.thirds || []).find(x => x.id === id) || { pts: 0, gd: 0 };
+      const tData = (tableData.thirds || []).find(x => x.id === id) || { pts: 0, gd: 0 };
       const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id)) || "";
       const ry    = TY + CARD_HEADER_H + ti * TROW_H;
       const midY  = ry + TROW_H / 2;
@@ -862,19 +876,21 @@ export default function App() {
     link.click();
   };
 
-  const downloadBracket = async () => {
-    const bracket = buildLiveBracket();
-    if (!bracket) return;
+  const downloadBracket = async (opts = {}) => {
+    const bracketData = opts.bracket ?? buildLiveBracket();
+    const koScores = opts.knockoutScores ?? knockoutScores;
+    const headerTitle = opts.title ?? "2026 FIFA DÜNYA KUPASI — TURNUVA AĞACI";
+    if (!bracketData) return;
 
     const DPR = 2.5;
 
     // Tüm bracket takımlarını yükle
     const allBracketIds = new Set();
     const addMatch = (m) => { if (m?.idA) allBracketIds.add(m.idA); if (m?.idB) allBracketIds.add(m.idB); };
-    [...bracket.left_r32, ...bracket.left_r16, ...bracket.left_qf,
-     ...bracket.right_r32, ...bracket.right_r16, ...bracket.right_qf].forEach(addMatch);
-    addMatch(bracket.left_sf); addMatch(bracket.right_sf);
-    addMatch(bracket.finalMatch); addMatch(bracket.thirdPlaceMatch);
+    [...bracketData.left_r32, ...bracketData.left_r16, ...bracketData.left_qf,
+     ...bracketData.right_r32, ...bracketData.right_r16, ...bracketData.right_qf].forEach(addMatch);
+    addMatch(bracketData.left_sf); addMatch(bracketData.right_sf);
+    addMatch(bracketData.finalMatch); addMatch(bracketData.thirdPlaceMatch);
     await preloadFlags([...allBracketIds]);
 
     // --- Layout ---
@@ -914,7 +930,7 @@ export default function App() {
     ctx.fillStyle = "#f59e0b";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("2026 FIFA DÜNYA KUPASI — TURNUVA AĞACI", TOTAL_W / 2, PAD + HEADER_H / 2);
+    ctx.fillText(headerTitle, TOTAL_W / 2, PAD + HEADER_H / 2);
 
     // Sütun başlıkları
     const colLabels = ["SON 32", "SON 16", "ÇEYREK F.", "YARI F."];
@@ -931,12 +947,14 @@ export default function App() {
 
     const BRACKET_TOP = PAD + HEADER_H + 22;
 
+    const officialOnlyExport = opts.officialOnly ?? false;
+
     // Maç kartı çizici
-    const drawMatchCard = (m, x, y, knockoutScores) => {
+    const drawMatchCard = (m, x, y, scores) => {
       const score = (() => {
         if (!m?.idA || !m?.idB) return undefined;
         const key = `ko_${[m.idA, m.idB].sort().join("_")}`;
-        const s = knockoutScores[key];
+        const s = scores[key];
         if (!s) return undefined;
         const storedA = [m.idA, m.idB].sort()[0];
         return m.idA === storedA ? s : { home: s.away, away: s.home };
@@ -944,7 +962,7 @@ export default function App() {
 
       const hasScore = score && score.home !== "" && score.away !== "" && score.home !== undefined;
       const sw = hasScore ? scoreWinner(score) : null;
-      const actualWinner = hasScore ? (sw === "home" || sw === "draw" ? m?.idA : m?.idB) : m?.winner;
+      const actualWinner = hasScore ? (sw === "home" || sw === "draw" ? m?.idA : m?.idB) : (officialOnlyExport ? null : m?.winner);
 
       // Kart arka plan
       ctx.fillStyle = "#ffffff";
@@ -1003,7 +1021,7 @@ export default function App() {
           ctx.font = "900 11px monospace";
           ctx.fillStyle = isWin ? "#047857" : "#94a3b8";
           ctx.fillText(String(sc), x + CARD_W - 5, midY);
-        } else {
+        } else if (!officialOnlyExport) {
           ctx.font = "700 9.5px monospace";
           ctx.fillStyle = isWin ? "#047857" : "#64748b";
           ctx.fillText(`${m?.[ri === 0 ? "pA" : "pB"] ?? 50}%`, x + CARD_W - 5, midY);
@@ -1021,12 +1039,12 @@ export default function App() {
     };
 
     // Sol taraf
-    const leftCols = [bracket.left_r32, bracket.left_r16, bracket.left_qf, [bracket.left_sf]];
+    const leftCols = [bracketData.left_r32, bracketData.left_r16, bracketData.left_qf, [bracketData.left_sf]];
     leftCols.forEach((matches, ci) => {
       const x = PAD + ci * (CARD_W + COL_GAP);
       matches.forEach((m, mi) => {
         const y = getMatchY(mi, matches.length);
-        drawMatchCard(m, x, y, knockoutScores);
+        drawMatchCard(m, x, y, koScores);
       });
     });
 
@@ -1055,13 +1073,13 @@ export default function App() {
     });
 
     // Sağ taraf
-    const rightCols = [[bracket.right_sf], bracket.right_qf, bracket.right_r16, bracket.right_r32];
+    const rightCols = [[bracketData.right_sf], bracketData.right_qf, bracketData.right_r16, bracketData.right_r32];
     const rightStartX = PAD + SIDE_W + COL_GAP * 2 + CENTER_W;
     rightCols.forEach((matches, ci) => {
       const x = rightStartX + ci * (CARD_W + COL_GAP);
       matches.forEach((m, mi) => {
         const y = getMatchY(mi, matches.length);
-        drawMatchCard(m, x, y, knockoutScores);
+        drawMatchCard(m, x, y, koScores);
       });
     });
 
@@ -1132,8 +1150,8 @@ export default function App() {
     ctx.fillText("★  FİNAL  ★", CX + CENTER_W / 2, finalY + 11);
 
     // Final finalistleri
-    [[bracket.finalMatch.idA, bracket.finalMatch.pA, bracket.finalMatch.winner === bracket.finalMatch.idA],
-     [bracket.finalMatch.idB, bracket.finalMatch.pB, bracket.finalMatch.winner === bracket.finalMatch.idB]
+    [[bracketData.finalMatch.idA, bracketData.finalMatch.pA, bracketData.finalMatch.winner === bracketData.finalMatch.idA],
+     [bracketData.finalMatch.idB, bracketData.finalMatch.pB, bracketData.finalMatch.winner === bracketData.finalMatch.idB]
     ].forEach(([id, pct, isWin], ri) => {
       const fy = finalY + 26 + ri * 28;
       const midY = fy + 13;
@@ -1153,16 +1171,18 @@ export default function App() {
       ctx.textAlign = "left"; ctx.textBaseline = "middle";
       ctx.fillText(INITIAL_TEAMS[id]?.name || "---", CX + 34, midY);
       ctx.restore();
-      ctx.font = "800 9.5px monospace";
-      ctx.fillStyle = isWin ? "#fbbf24" : "rgba(255,255,255,0.4)";
-      ctx.textAlign = "right"; ctx.textBaseline = "middle";
-      ctx.fillText(`${pct}%`, CX + CENTER_W - 8, midY);
-      if (ri === 0) {
+      if (!officialOnlyExport) {
+        ctx.font = "800 9.5px monospace";
+        ctx.fillStyle = isWin ? "#fbbf24" : "rgba(255,255,255,0.4)";
+        ctx.textAlign = "right"; ctx.textBaseline = "middle";
+        ctx.fillText(`${pct}%`, CX + CENTER_W - 8, midY);
+      }
+      if (ri === 0 && !officialOnlyExport) {
         const barY = fy + 26 + 2;
         ctx.fillStyle = "rgba(255,255,255,0.06)";
         roundRect(ctx, CX + 6, barY, CENTER_W - 12, 4, 2); ctx.fill();
         ctx.fillStyle = "#10b981";
-        roundRect(ctx, CX + 6, barY, (CENTER_W - 12) * bracket.finalMatch.pA / 100, 4, 2); ctx.fill();
+        roundRect(ctx, CX + 6, barY, (CENTER_W - 12) * bracketData.finalMatch.pA / 100, 4, 2); ctx.fill();
       }
     });
 
@@ -1176,9 +1196,9 @@ export default function App() {
     ctx.fillStyle = "rgba(251,191,36,0.7)";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("DÜNYA ŞAMPİYONU", CX + CENTER_W / 2, champY + 9);
-    const wId = bracket.finalMatch.winner;
-    const wFlag = flagCache.current[INITIAL_TEAMS[wId]?.iso?.toLowerCase()];
-    const wName = INITIAL_TEAMS[wId]?.name || "---";
+    const wId = bracketData.finalMatch.winner;
+    const wFlag = wId ? flagCache.current[INITIAL_TEAMS[wId]?.iso?.toLowerCase()] : null;
+    const wName = wId ? INITIAL_TEAMS[wId]?.name : "---";
     if (wFlag) ctx.drawImage(wFlag, CX + CENTER_W / 2 - 40, champY + 16, 22, 15);
     ctx.font = "900 12px system-ui";
     ctx.fillStyle = "#fbbf24";
@@ -1197,11 +1217,11 @@ export default function App() {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText("★  ÜÇÜNCÜLÜK MAÇI  ★", thirdX + thirdBlockW / 2, thirdY + 9);
 
-    drawMatchCard(bracket.thirdPlaceMatch, thirdX, thirdY + 20, knockoutScores);
+    drawMatchCard(bracketData.thirdPlaceMatch, thirdX, thirdY + 20, koScores);
 
     // İndir
     const link = document.createElement("a");
-    link.download = "turnuva_agaci_wc26.png";
+    link.download = opts.filename ?? "turnuva_agaci_wc26.png";
     link.href = canvas.toDataURL("image/png", 1.0);
     link.click();
   };
@@ -1362,6 +1382,19 @@ export default function App() {
     if (h > a) return sorted[0];
     if (a > h) return sorted[1];
     return sorted[0]; 
+  };
+
+  const getOfficialKOWinner = (idA, idB) => {
+    if (!idA || !idB) return null;
+    const key = `ko_${[idA,idB].sort().join("_")}`;
+    const sc = officialKOScores[key];
+    if (!sc || sc.home === "" || sc.away === "" || sc.home === undefined || sc.away === undefined) return null;
+    const sorted = [idA,idB].sort();
+    const h = parseInt(sc.home), a = parseInt(sc.away);
+    if (isNaN(h) || isNaN(a)) return null;
+    if (h > a) return sorted[0];
+    if (a > h) return sorted[1];
+    return sorted[0];
   };
 
   // === MONTE CARLO SIMÜLASYON MOTORU ===
@@ -1596,7 +1629,84 @@ export default function App() {
     return { left_r32, left_r16, left_qf, left_sf, right_r32, right_r16, right_qf, right_sf, finalMatch, thirdPlaceMatch, sortedThirds, qualifiedThirds };
   };
 
+  const buildOfficialOnlyBracket = () => {
+    if (!officialOnlyTableData.groups || Object.keys(officialOnlyTableData.groups).length === 0) return null;
+
+    const getTop = (g) => (officialOnlyTableData.groups[g] || []).map(t => t.id);
+
+    const allThirds = Object.keys(GROUPS_CONFIG).map(g => getTop(g)[2]);
+    const sortedThirds = [...allThirds].sort((a, b) => {
+      const tB = officialOnlyTableData.thirds.find(x => x.id === b) || { pts: 0, gd: 0 };
+      const tA = officialOnlyTableData.thirds.find(x => x.id === a) || { pts: 0, gd: 0 };
+      return tB.pts - tA.pts || tB.gd - tA.gd || activeTeams[b].elo - activeTeams[a].elo;
+    });
+
+    const qualifiedThirds = sortedThirds.slice(0, 8);
+    const qualifiedLetters = qualifiedThirds.map(id => Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id))).sort().join("");
+    const slotMap = {};
+    [0,1,2,3,4,5,6,7].forEach((idx) => {
+      const targetGroup = getFifaTargetThird(qualifiedLetters, idx);
+      const foundId = qualifiedThirds.find(id => GROUPS_CONFIG[targetGroup]?.includes(id));
+      slotMap[idx] = foundId || null;
+    });
+
+    const resolveMatchOfficial = (idA, idB) => {
+      if (!idA || !idB) return { idA, idB, pA: 50, pB: 50, winner: null, loser: null, hasScore: false };
+      const koW = getOfficialKOWinner(idA, idB);
+      if (koW) {
+        return { idA, idB, pA: koW === idA ? 100 : 0, pB: koW === idB ? 100 : 0, winner: koW, loser: koW === idA ? idB : idA, hasScore: true };
+      }
+      return { idA, idB, pA: 50, pB: 50, winner: null, loser: null, hasScore: false };
+    };
+
+    const advanceWinner = (match) => (match?.hasScore && match.winner) ? match.winner : null;
+
+    const left_r32 = [
+      resolveMatchOfficial(getTop("E")[0], slotMap[3]), resolveMatchOfficial(getTop("I")[0], slotMap[5]),
+      resolveMatchOfficial(getTop("A")[1], getTop("B")[1]), resolveMatchOfficial(getTop("F")[0], getTop("C")[1]),
+      resolveMatchOfficial(getTop("K")[1], getTop("L")[1]), resolveMatchOfficial(getTop("H")[0], getTop("J")[1]),
+      resolveMatchOfficial(getTop("D")[0], slotMap[2]), resolveMatchOfficial(getTop("G")[0], slotMap[4])
+    ];
+    const left_r16 = [
+      resolveMatchOfficial(advanceWinner(left_r32[0]), advanceWinner(left_r32[1])),
+      resolveMatchOfficial(advanceWinner(left_r32[2]), advanceWinner(left_r32[3])),
+      resolveMatchOfficial(advanceWinner(left_r32[4]), advanceWinner(left_r32[5])),
+      resolveMatchOfficial(advanceWinner(left_r32[6]), advanceWinner(left_r32[7]))
+    ];
+    const left_qf = [
+      resolveMatchOfficial(advanceWinner(left_r16[0]), advanceWinner(left_r16[1])),
+      resolveMatchOfficial(advanceWinner(left_r16[2]), advanceWinner(left_r16[3]))
+    ];
+    const left_sf = resolveMatchOfficial(advanceWinner(left_qf[0]), advanceWinner(left_qf[1]));
+
+    const right_r32 = [
+      resolveMatchOfficial(getTop("C")[0], getTop("F")[1]), resolveMatchOfficial(getTop("E")[1], getTop("I")[1]),
+      resolveMatchOfficial(getTop("A")[0], slotMap[0]), resolveMatchOfficial(getTop("L")[0], slotMap[7]),
+      resolveMatchOfficial(getTop("J")[0], getTop("H")[1]), resolveMatchOfficial(getTop("D")[1], getTop("G")[1]),
+      resolveMatchOfficial(getTop("B")[0], slotMap[1]), resolveMatchOfficial(getTop("K")[0], slotMap[6])
+    ];
+    const right_r16 = [
+      resolveMatchOfficial(advanceWinner(right_r32[0]), advanceWinner(right_r32[1])),
+      resolveMatchOfficial(advanceWinner(right_r32[2]), advanceWinner(right_r32[3])),
+      resolveMatchOfficial(advanceWinner(right_r32[4]), advanceWinner(right_r32[5])),
+      resolveMatchOfficial(advanceWinner(right_r32[6]), advanceWinner(right_r32[7]))
+    ];
+    const right_qf = [
+      resolveMatchOfficial(advanceWinner(right_r16[0]), advanceWinner(right_r16[1])),
+      resolveMatchOfficial(advanceWinner(right_r16[2]), advanceWinner(right_r16[3]))
+    ];
+    const right_sf = resolveMatchOfficial(advanceWinner(right_qf[0]), advanceWinner(right_qf[1]));
+
+    const finalMatch = resolveMatchOfficial(advanceWinner(left_sf), advanceWinner(right_sf));
+    const thirdPlaceMatch = resolveMatchOfficial(
+      left_sf.hasScore ? left_sf.loser : null,
+      right_sf.hasScore ? right_sf.loser : null
+    );
+    return { left_r32, left_r16, left_qf, left_sf, right_r32, right_r16, right_qf, right_sf, finalMatch, thirdPlaceMatch, sortedThirds, qualifiedThirds };
+  };
+
   const bracket = buildLiveBracket();
+  const officialBracket = buildOfficialOnlyBracket();
   const allFixtures = generateAllFixtures();
 
   const renderGroups = () => {
@@ -1672,6 +1782,72 @@ export default function App() {
     });
   };
 
+  const renderOfficialGroups = () => {
+    if (!officialOnlyTableData.groups || Object.keys(officialOnlyTableData.groups).length === 0) return null;
+    const qualifiedThirdIds = new Set((officialOnlyTableData.thirds || []).slice(0, 8).map(t => t.id));
+    return Object.keys(GROUPS_CONFIG).map(gName => {
+      const sorted = officialOnlyTableData.groups[gName] || [];
+      return (
+        <div key={gName} className="group-card">
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
+            <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>GRUP {gName}</span>
+            <div style={{display:"flex",gap:0,alignItems:"center"}}>
+              <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
+              <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
+            </div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            {sorted.map((item, index) => {
+              const id = item.id;
+              const isTop2 = index < 2;
+              const isQThird = index === 2 && qualifiedThirdIds.has(id);
+              let rowBg = "transparent";
+              let leftAccent = "transparent";
+              let nameColor = "#374151";
+              let fontWeight = 500;
+              if (isTop2) {
+                rowBg = "rgba(16,185,129,0.09)";
+                leftAccent = "#10b981";
+                nameColor = "#065f46";
+                fontWeight = 700;
+              } else if (isQThird) {
+                rowBg = "rgba(249,115,22,0.09)";
+                leftAccent = "#f97316";
+                nameColor = "#9a3412";
+                fontWeight = 700;
+              }
+              const gdColor = item.gd > 0 ? "#1d4ed8" : item.gd < 0 ? "#dc2626" : "#94a3b8";
+              return (
+                <div key={id} style={{
+                  display:"flex",
+                  alignItems:"center",
+                  background: rowBg,
+                  borderRadius: 6,
+                  borderLeft: `3px solid ${leftAccent}`,
+                  paddingLeft: 5,
+                  paddingRight: 4,
+                  paddingTop: 3,
+                  paddingBottom: 3,
+                  minHeight: 26,
+                }}>
+                  <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isTop2?"#059669": isQThird?"#ea580c":"#cbd5e1",width:12,flexShrink:0,textAlign:"center"}}>{index+1}</span>
+                  <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
+                  <span style={{flex:1,fontSize:12,fontWeight,color:nameColor,whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>{INITIAL_TEAMS[id]?.name}</span>
+                  <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColor,flexShrink:0}}>
+                    {item.gd > 0 ? `+${item.gd}` : item.gd}
+                  </span>
+                  <span style={{width:24,textAlign:"center",fontSize:12,fontFamily:"var(--font-mono)",fontWeight:900,color: isTop2?"#047857": isQThird?"#ea580c":"#0f172a",flexShrink:0}}>
+                    {item.pts}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    });
+  };
+
   const inputStyle = { width:32, height:24, background:"#fff", border:"1px solid #cbd5e1", borderRadius:5, textAlign:"center", color:"#047857", fontWeight:700, fontFamily:"monospace", fontSize:12, outline:"none", flexShrink:0 };
 
   // DB yüklenene kadar splash göster
@@ -1706,7 +1882,7 @@ export default function App() {
 
         {/* Desktop nav */}
         <nav className="desktop-nav" style={{display:"flex",background:"rgba(255,255,255,0.06)",padding:3,borderRadius:11,border:"1px solid rgba(255,255,255,0.1)",gap:2}}>
-          {[["bracket","Turnuva Ağacı"],["groupstats","Grup Analizi"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["difficulty","Fikstür Zorluğu"],["elo","ELO Güncelle"]].map(([tab,label])=>(
+          {[["bracket","Turnuva Ağacı"],["livestatus","Canlı Durum"],["groupstats","Grup Analizi"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["difficulty","Fikstür Zorluğu"],["elo","ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>setActiveTab(tab)} className={`nav-btn ${activeTab===tab?"active":"inactive"}`}>{label}</button>
           ))}
         </nav>
@@ -1727,7 +1903,7 @@ export default function App() {
       {/* Mobile dropdown menu */}
       {menuOpen && (
         <div className="mobile-menu" style={{position:"sticky",top:52,zIndex:190,background:"#0d1628",borderBottom:"1px solid rgba(255,255,255,0.10)",padding:"8px 12px",display:"flex",flexDirection:"column",gap:4,boxShadow:"0 8px 24px rgba(0,0,0,0.3)"}}>
-          {[["bracket","🏆 Turnuva Ağacı"],["groupstats","📈 Grup Analizi"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["difficulty","🎯 Fikstür Zorluğu"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
+          {[["bracket","🏆 Turnuva Ağacı"],["livestatus","📡 Canlı Durum"],["groupstats","📈 Grup Analizi"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["difficulty","🎯 Fikstür Zorluğu"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>{setActiveTab(tab);setMenuOpen(false);}}
               style={{
                 width:"100%",textAlign:"left",padding:"11px 14px",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",border:"none",
@@ -1836,6 +2012,100 @@ export default function App() {
               <div className="bracket-scroll-wrapper" style={{padding:"14px",overflowX:"auto"}}>
                 <div style={{minWidth:"1200px"}}>
                   <BracketView bracket={bracket} knockoutScores={knockoutScores} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* === CANLI DURUM TAB === */}
+        {activeTab==="livestatus" && officialBracket && (
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid #10b981",borderRadius:10,padding:"8px 14px",fontSize:11.5,color:"#047857",fontWeight:500}}>
+              📡 Bu sayfa yalnızca resmi onaylanmış skorları baz alır. Tahmin ve simülasyon sonuçları dahil edilmez; turnuvanın anlık gerçek durumunu gösterir.
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
+              <button onClick={()=>downloadAsImage(liveGroupsPanelRef,"canli_durum_gruplar_wc26.png",{tableData:officialOnlyTableData,bracket:officialBracket})}
+                style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:"linear-gradient(135deg,#0ea5e9,#0284c7)",border:"none",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",boxShadow:"0 2px 8px rgba(2,132,199,0.35)",letterSpacing:"0.04em",fontFamily:"monospace"}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                GRUPLAR + 3.LER
+              </button>
+              <button onClick={()=>downloadBracket({bracket:officialBracket,knockoutScores:officialKOScores,title:"2026 FIFA DÜNYA KUPASI — CANLI DURUM",officialOnly:true,filename:"canli_durum_agaci_wc26.png"})}
+                style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:"linear-gradient(135deg,#10b981,#059669)",border:"none",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",boxShadow:"0 2px 8px rgba(5,150,105,0.35)",letterSpacing:"0.04em",fontFamily:"monospace"}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                TURNUVA AĞACI
+              </button>
+            </div>
+            <div className="bracket-top-panel" ref={liveGroupsPanelRef}>
+              <div style={{flex:1,minWidth:0,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
+                <div className="groups-panel-grid">{renderOfficialGroups()}</div>
+              </div>
+              <div className="thirds-panel" style={{flexShrink:0,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>EN İYİ 3.LER</span>
+                  </div>
+                  <div style={{display:"flex",gap:0,alignItems:"center"}}>
+                    <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
+                    <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
+                  </div>
+                </div>
+                <div className="thirds-mobile-grid" style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
+                  {officialBracket.sortedThirds.map((id, index) => {
+                    const isQ = officialBracket.qualifiedThirds.includes(id);
+                    const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
+                    const tData = officialOnlyTableData.thirds.find(x => x.id === id) || { pts: 0, gd: 0 };
+                    const leftAccent = isQ ? "#f97316" : "transparent";
+                    const rowBg = isQ ? "rgba(249,115,22,0.09)" : "transparent";
+                    const nameColor = isQ ? "#9a3412" : "#374151";
+                    const gdColor = tData.gd > 0 ? "#1d4ed8" : tData.gd < 0 ? "#dc2626" : "#94a3b8";
+                    const gdColorFinal = isQ ? gdColor : "#94a3b8";
+                    return (
+                      <div key={id} style={{
+                        display:"flex", alignItems:"center",
+                        background: rowBg,
+                        borderRadius: 6,
+                        borderLeft: `3px solid ${leftAccent}`,
+                        paddingLeft: 5, paddingRight: 4,
+                        paddingTop: 3, paddingBottom: 3,
+                        minHeight: 26,
+                      }}>
+                        <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?"#ea580c":"#94a3b8",width:16,flexShrink:0,textAlign:"center"}}>{index+1}</span>
+                        <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
+                        <span style={{flex:1,fontSize:11.5,fontWeight: isQ?700:500,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>
+                          {INITIAL_TEAMS[id]?.name} <span style={{fontSize:9,color: isQ?"#f97316":"#94a3b8",fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
+                        </span>
+                        <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColorFinal,flexShrink:0}}>
+                          {tData.gd > 0 ? `+${tData.gd}` : tData.gd}
+                        </span>
+                        <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:900,color: isQ?"#ea580c":"#374151",flexShrink:0}}>
+                          {tData.pts}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.04)"}} ref={liveBracketPanelRef}>
+              <div style={{background:"#0a0f1e",padding:"10px 14px",display:"flex",justifyContent:"space-between",gap:"8px",alignItems:"center"}}>
+                {[["SON 32","rgba(255,255,255,0.4)"],["SON 16","rgba(255,255,255,0.5)"],["ÇEYREK F.","rgba(255,255,255,0.65)"],["YARI F.","rgba(255,255,255,0.8)"],null,["YARI F.","rgba(255,255,255,0.8)"],["ÇEYREK F.","rgba(255,255,255,0.65)"],["SON 16","rgba(255,255,255,0.5)"],["SON 32","rgba(255,255,255,0.4)"]].map((item, i) => 
+                  item === null ? (
+                    <div key={i} style={{width:"230px",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                      <span style={{fontSize:9.5,fontWeight:900,color:"#f59e0b",letterSpacing:"0.1em",textTransform:"uppercase"}}>FİNAL</span>
+                    </div>
+                  ) : (
+                    <div key={i} style={{flex:"1 1 0%",maxWidth:"135px",fontSize:9,fontWeight:700,color:item[1],letterSpacing:"0.1em",textTransform:"uppercase",textAlign:"center"}}>
+                      {item[0]}
+                    </div>
+                  )
+                )}
+              </div>
+              <div className="bracket-scroll-wrapper" style={{padding:"14px",overflowX:"auto"}}>
+                <div style={{minWidth:"1200px"}}>
+                  <BracketView bracket={officialBracket} knockoutScores={officialKOScores} officialOnly={true} />
                 </div>
               </div>
             </div>
