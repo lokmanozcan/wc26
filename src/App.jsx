@@ -96,6 +96,20 @@ function generateAllFixtures() {
 const getWinProbability = (eloA, eloB) => 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
 const getFlagUrl = (iso) => iso ? `https://flagcdn.com/w40/${iso.toLowerCase()}.png` : "";
 
+const KNOCKOUT_PROGRESS_KEYS = ["champion", "f", "sf", "qf", "r16", "r32"];
+
+function compareKnockoutProgress(aId, bId, teamStats, eloById = {}) {
+  const tA = teamStats[aId] || {};
+  const tB = teamStats[bId] || {};
+  for (const key of KNOCKOUT_PROGRESS_KEYS) {
+    const diff = (tB[key] ?? 0) - (tA[key] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  const eloA = eloById[aId]?.elo ?? eloById[aId] ?? 0;
+  const eloB = eloById[bId]?.elo ?? eloById[bId] ?? 0;
+  return eloB - eloA;
+}
+
 function scoreWinner(score) {
   if (!score || score.home === "" || score.away === "" || score.home === undefined || score.away === undefined) return null;
   const h = parseInt(score.home), a = parseInt(score.away);
@@ -2757,7 +2771,9 @@ export default function App() {
 
         {/* === MATRIX TAB === */}
         {activeTab==="matrix" && simResults && (() => {
-          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a,b)=>(simResults.teams[b]?.champion??0)-(simResults.teams[a]?.champion??0));
+          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a, b) =>
+            compareKnockoutProgress(a, b, simResults.teams, activeTeams)
+          );
           const half = Math.ceil(sortedIds.length / 2);
           const leftIds = sortedIds.slice(0, half);
           const rightIds = sortedIds.slice(half);
