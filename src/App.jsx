@@ -98,13 +98,23 @@ const getFlagUrl = (iso) => iso ? `https://flagcdn.com/w40/${iso.toLowerCase()}.
 
 const KNOCKOUT_PROGRESS_KEYS = ["champion", "f", "sf", "qf", "r16", "r32"];
 
-function compareKnockoutProgress(aId, bId, teamStats, eloById = {}) {
+function compareKnockoutProgress(aId, bId, teamStats, eloById = {}, displayDecimals = 1) {
   const tA = teamStats[aId] || {};
   const tB = teamStats[bId] || {};
+  const factor = Math.pow(10, displayDecimals);
+
+  // Ekranda aynı görünen yüzdeler (toFixed(1)) eşit sayılır → sonraki tura geç
+  for (const key of KNOCKOUT_PROGRESS_KEYS) {
+    const roundedDiff = Math.round((tB[key] ?? 0) * factor) - Math.round((tA[key] ?? 0) * factor);
+    if (roundedDiff !== 0) return roundedDiff;
+  }
+
+  // Tüm turlarda görünür eşitlik — tam ondalık değerlerle ayır
   for (const key of KNOCKOUT_PROGRESS_KEYS) {
     const diff = (tB[key] ?? 0) - (tA[key] ?? 0);
-    if (diff !== 0) return diff;
+    if (Math.abs(diff) > 1e-9) return diff > 0 ? 1 : -1;
   }
+
   const eloA = eloById[aId]?.elo ?? eloById[aId] ?? 0;
   const eloB = eloById[bId]?.elo ?? eloById[bId] ?? 0;
   return eloB - eloA;
