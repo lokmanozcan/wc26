@@ -240,12 +240,14 @@ function MatchCard({ m, score, officialOnly = false }) {
 
   const flagStyle = { width:15, height:11, borderRadius:2, objectFit:"cover", flexShrink:0, display:"block" };
 
+  const hasSlotLabel = isLabelA || isLabelB;
+
   return (
-    <div className="match-card" style={{ position:"relative" }}>
-      <div className={`match-row ${isWinnerA ? "winner" : "loser"}`}>
-        <div style={{ display:"flex", alignItems:"center", gap:4, flex:1, minWidth:0 }}>
+    <div className={`match-card${hasSlotLabel ? " has-slot-label" : ""}`} style={{ position:"relative" }}>
+      <div className={`match-row ${isWinnerA ? "winner" : "loser"}${isLabelA ? " slot-row" : ""}`}>
+        <div style={{ display:"flex", alignItems: isLabelA ? "flex-start" : "center", gap:4, flex:1, minWidth:0 }}>
           {!isLabelA && m?.idA && <img src={getFlagUrl(flagA)} style={flagStyle} alt="" />}
-          <span className="team-name" style={isLabelA ? { fontFamily:"var(--font-mono)", fontSize:10, fontWeight:700, color:"#64748b", letterSpacing:"0.04em" } : undefined}>{nameA}</span>
+          <span className={`team-name${isLabelA ? " slot-label" : ""}`}>{nameA}</span>
         </div>
         {hasScore ? (
           <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerA ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center", flexShrink:0 }}>
@@ -257,10 +259,10 @@ function MatchCard({ m, score, officialOnly = false }) {
           <span className="pct-badge" style={{ color: isWinnerA ? "#047857" : "#64748b", flexShrink:0 }}>{m?.pA ?? 50}%</span>
         )}
       </div>
-      <div className={`match-row ${isWinnerB ? "winner" : "loser"}`}>
-        <div style={{ display:"flex", alignItems:"center", gap:4, flex:1, minWidth:0 }}>
+      <div className={`match-row ${isWinnerB ? "winner" : "loser"}${isLabelB ? " slot-row" : ""}`}>
+        <div style={{ display:"flex", alignItems: isLabelB ? "flex-start" : "center", gap:4, flex:1, minWidth:0 }}>
           {!isLabelB && m?.idB && <img src={getFlagUrl(flagB)} style={flagStyle} alt="" />}
-          <span className="team-name" style={isLabelB ? { fontFamily:"var(--font-mono)", fontSize:10, fontWeight:700, color:"#64748b", letterSpacing:"0.04em" } : undefined}>{nameB}</span>
+          <span className={`team-name${isLabelB ? " slot-label" : ""}`}>{nameB}</span>
         </div>
         {hasScore ? (
           <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerB ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center", flexShrink:0 }}>
@@ -275,6 +277,63 @@ function MatchCard({ m, score, officialOnly = false }) {
       {hasScore && (
         <div style={{ position:"absolute", top:2, right:2, width:6, height:6, borderRadius:"50%", background:"#10b981" }} />
       )}
+    </div>
+  );
+}
+
+function ThirdsPanel({ sortedThirdIds, qualifiedThirdIds, thirdsData }) {
+  const qualSet = new Set(qualifiedThirdIds);
+  return (
+    <div className="thirds-panel" style={{flexShrink:0,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>EN İYİ 3.LER</span>
+        </div>
+        <div style={{display:"flex",gap:0,alignItems:"center"}}>
+          <span style={{fontSize:10,fontWeight:800,color:"#64748b",fontFamily:"var(--font-mono)",width:18,textAlign:"center",letterSpacing:"0.04em"}}>O</span>
+          <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
+          <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
+        </div>
+      </div>
+      <div className="thirds-mobile-grid" style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
+        {sortedThirdIds.map((id, index) => {
+          const isQ = qualSet.has(id);
+          const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
+          const tData = thirdsData.find(x => x.id === id) || { pts: 0, gd: 0, played: 0 };
+          const leftAccent = isQ ? "#f97316" : "transparent";
+          const rowBg = isQ ? "rgba(249,115,22,0.09)" : "transparent";
+          const nameColor = isQ ? "#9a3412" : "#374151";
+          const gdColor = tData.gd > 0 ? "#1d4ed8" : tData.gd < 0 ? "#dc2626" : "#94a3b8";
+          const gdColorFinal = isQ ? gdColor : "#94a3b8";
+          return (
+            <div key={id} style={{
+              display:"flex", alignItems:"center",
+              background: rowBg,
+              borderRadius: 6,
+              borderLeft: `3px solid ${leftAccent}`,
+              paddingLeft: 5, paddingRight: 4,
+              paddingTop: 3, paddingBottom: 3,
+              minHeight: 26,
+            }}>
+              <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?"#ea580c":"#94a3b8",width:16,flexShrink:0,textAlign:"center"}}>{index+1}</span>
+              <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
+              <span style={{flex:1,fontSize:11.5,fontWeight: isQ?700:500,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>
+                {INITIAL_TEAMS[id]?.name} <span style={{fontSize:9,color: isQ?"#f97316":"#94a3b8",fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
+              </span>
+              <span style={{width:18,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:600,color:"#64748b",flexShrink:0}}>
+                {tData.played ?? 0}
+              </span>
+              <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColorFinal,flexShrink:0}}>
+                {tData.gd > 0 ? `+${tData.gd}` : tData.gd}
+              </span>
+              <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:900,color: isQ?"#ea580c":"#374151",flexShrink:0}}>
+                {tData.pts}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -341,8 +400,8 @@ function BracketView({ bracket, knockoutScores, officialOnly = false }) {
 
   const colStyle = (justify) => ({
     flex: "1 1 0%",
-    minWidth: "115px",
-    maxWidth: "135px",
+    minWidth: "130px",
+    maxWidth: "150px",
     display: "flex",
     flexDirection: "column",
     justifyContent: justify || "space-around",
@@ -434,7 +493,7 @@ function BracketView({ bracket, knockoutScores, officialOnly = false }) {
                     marginBottom: i === 0 ? 4 : 0,
                   }}>
                     {t.id && !t.label && <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{width:20,height:14,borderRadius:3,objectFit:"cover",flexShrink:0,boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}} alt="" />}
-                    <span style={{flex:1,fontSize: t.label ? 10 : 11.5,fontFamily: t.label ? "var(--font-mono)" : "var(--font-sans)",fontWeight: t.isWinner?800:600,color: t.label ? "rgba(255,255,255,0.45)" : (t.isWinner?"#fbbf24":"rgba(255,255,255,0.7)"),overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    <span className={t.label ? "team-name slot-label" : undefined} style={{flex:1,fontSize: t.label ? undefined : 11.5,fontFamily: t.label ? undefined : "var(--font-sans)",fontWeight: t.isWinner?800:600,color: t.label ? undefined : (t.isWinner?"#fbbf24":"rgba(255,255,255,0.7)"),overflow: t.label ? "visible" : "hidden",textOverflow: t.label ? "clip" : "ellipsis",whiteSpace: t.label ? "normal" : "nowrap",wordBreak: t.label ? "break-all" : undefined}}>
                       {t.label || INITIAL_TEAMS[t.id]?.name || "—"}
                     </span>
                     {t.isWinner && (
@@ -507,7 +566,7 @@ function BracketView({ bracket, knockoutScores, officialOnly = false }) {
                   marginBottom: i===0 ? 3 : 0,
                 }}>
                   {t.id && !t.label && <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}} alt="" />}
-                  <span style={{flex:1,fontSize: t.label ? 10 : 11,fontFamily: t.label ? "var(--font-mono)" : "var(--font-sans)",fontWeight: t.isWinner?700:500,color: t.label ? "#94a3b8" : (t.isWinner?"#5b21b6":"#374151"),overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  <span className={t.label ? "team-name slot-label" : undefined} style={{flex:1,fontSize: t.label ? undefined : 11,fontFamily: t.label ? undefined : "var(--font-sans)",fontWeight: t.isWinner?700:500,color: t.label ? undefined : (t.isWinner?"#5b21b6":"#374151"),overflow: t.label ? "visible" : "hidden",textOverflow: t.label ? "clip" : "ellipsis",whiteSpace: t.label ? "normal" : "nowrap",wordBreak: t.label ? "break-all" : undefined}}>
                     {t.label || INITIAL_TEAMS[t.id]?.name || "—"}
                   </span>
                   {t.isWinner && <svg width="10" height="10" viewBox="0 0 24 24" fill="#7c3aed"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>}
@@ -860,9 +919,11 @@ export default function App() {
     ctx.textBaseline = "middle";
     ctx.fillText("EN İYİ 3.LER", TX + 26, TY + 14);
     ctx.font      = "bold 9px monospace";
-    ctx.fillStyle = "#1d4ed8";
+    ctx.fillStyle = "#64748b";
     ctx.textAlign = "right";
-    ctx.fillText("AV", TX + THIRDS_W - 26, TY + 14);
+    ctx.fillText("O", TX + THIRDS_W - 50, TY + 14);
+    ctx.fillStyle = "#1d4ed8";
+    ctx.fillText("AV", TX + THIRDS_W - 32, TY + 14);
     ctx.fillStyle = "#0f172a";
     ctx.fillText("P",  TX + THIRDS_W - CARD_PAD, TY + 14);
     ctx.textAlign = "left";
@@ -877,7 +938,7 @@ export default function App() {
     for (let ti = 0; ti < thirds.length; ti++) {
       const id    = thirds[ti];
       const isQ   = qualThirds.has(id);
-      const tData = (tableData.thirds || []).find(x => x.id === id) || { pts: 0, gd: 0 };
+      const tData = (tableData.thirds || []).find(x => x.id === id) || { pts: 0, gd: 0, played: 0 };
       const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id)) || "";
       const ry    = TY + CARD_HEADER_H + ti * TROW_H;
       const midY  = ry + TROW_H / 2;
@@ -906,10 +967,14 @@ export default function App() {
       ctx.fillText(`${name} (${gLetter})`, TX + 43, midY);
 
       const gd = tData.gd;
+      ctx.font      = "600 10px monospace";
+      ctx.fillStyle = "#64748b";
+      ctx.textAlign = "right";
+      ctx.fillText(String(tData.played ?? 0), TX + THIRDS_W - 50, midY);
+
       ctx.font      = "700 10.5px monospace";
       ctx.fillStyle = isQ ? (gd > 0 ? "#1d4ed8" : gd < 0 ? "#dc2626" : "#94a3b8") : "#94a3b8";
-      ctx.textAlign = "right";
-      ctx.fillText(gd > 0 ? `+${gd}` : String(gd), TX + THIRDS_W - 26, midY);
+      ctx.fillText(gd > 0 ? `+${gd}` : String(gd), TX + THIRDS_W - 32, midY);
 
       ctx.font      = "900 11px monospace";
       ctx.fillStyle = isQ ? "#ea580c" : "#374151";
@@ -1581,14 +1646,8 @@ export default function App() {
     if (!simResults || !liveTableData.groups || Object.keys(liveTableData.groups).length === 0) return null;
     
     const getTop = (g) => (liveTableData.groups[g] || []).map(t => t.id);
-    
-    const allThirds = Object.keys(GROUPS_CONFIG).map(g => getTop(g)[2]);
-    const sortedThirds = [...allThirds].sort((a, b) => {
-      const tB = liveTableData.thirds.find(x => x.id === b) || { pts: 0, gd: 0 };
-      const tA = liveTableData.thirds.find(x => x.id === a) || { pts: 0, gd: 0 };
-      return tB.pts - tA.pts || tB.gd - tA.gd || activeTeams[b].elo - activeTeams[a].elo;
-    });
 
+    const sortedThirds = (liveTableData.thirds || []).map((t) => t.id);
     const qualifiedThirds = sortedThirds.slice(0, 8);
     const qualifiedLetters = qualifiedThirds.map(id => Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id))).sort().join("");
     // Annex C slot sırası (index): 0=1A, 1=1B, 2=1D, 3=1E, 4=1G, 5=1I, 6=1K, 7=1L
@@ -1652,13 +1711,7 @@ export default function App() {
 
     const getTop = (g) => (officialOnlyTableData.groups[g] || []).map(t => t.id);
 
-    const allThirds = Object.keys(GROUPS_CONFIG).map(g => getTop(g)[2]);
-    const sortedThirds = [...allThirds].sort((a, b) => {
-      const tB = officialOnlyTableData.thirds.find(x => x.id === b) || { pts: 0, gd: 0 };
-      const tA = officialOnlyTableData.thirds.find(x => x.id === a) || { pts: 0, gd: 0 };
-      return tB.pts - tA.pts || tB.gd - tA.gd || activeTeams[b].elo - activeTeams[a].elo;
-    });
-
+    const sortedThirds = (officialOnlyTableData.thirds || []).map((t) => t.id);
     const qualifiedThirds = sortedThirds.slice(0, 8);
     const qualifiedLetters = qualifiedThirds.map(id => Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id))).sort().join("");
     const slotMap = {};
@@ -1985,56 +2038,11 @@ export default function App() {
                 <div className="groups-panel-grid">{renderGroups()}</div>
               </div>
               {/* Thirds Panel - right side, same height */}
-              <div className="thirds-panel" style={{flexShrink:0,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
-                {/* Başlık + kolon etiketleri — grup kartlarıyla aynı stil */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>EN İYİ 3.LER</span>
-                  </div>
-                  <div style={{display:"flex",gap:0,alignItems:"center"}}>
-                    <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
-                    <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
-                  </div>
-                </div>
-                <div className="thirds-mobile-grid" style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
-                  {bracket.sortedThirds.map((id, index) => {
-                    const isQ = bracket.qualifiedThirds.includes(id);
-                    const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
-                    const tData = liveTableData.thirds.find(x => x.id === id) || { pts: 0, gd: 0 };
-                    const leftAccent = isQ ? "#f97316" : "transparent";
-                    const rowBg = isQ ? "rgba(249,115,22,0.09)" : "transparent";
-                    const nameColor = isQ ? "#9a3412" : "#374151";
-                    const gdColor = tData.gd > 0 ? "#1d4ed8" : tData.gd < 0 ? "#dc2626" : "#94a3b8";
-                    const gdColorFinal = isQ ? gdColor : "#94a3b8";
-                    return (
-                      <div key={id} style={{
-                        display:"flex", alignItems:"center",
-                        background: rowBg,
-                        borderRadius: 6,
-                        borderLeft: `3px solid ${leftAccent}`,
-                        paddingLeft: 5, paddingRight: 4,
-                        paddingTop: 3, paddingBottom: 3,
-                        minHeight: 26,
-                      }}>
-                        <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?"#ea580c":"#94a3b8",width:16,flexShrink:0,textAlign:"center"}}>{index+1}</span>
-                        <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
-                        <span style={{flex:1,fontSize:11.5,fontWeight: isQ?700:500,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>
-                          {INITIAL_TEAMS[id]?.name} <span style={{fontSize:9,color: isQ?"#f97316":"#94a3b8",fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
-                        </span>
-                        {/* AV */}
-                        <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColorFinal,flexShrink:0}}>
-                          {tData.gd > 0 ? `+${tData.gd}` : tData.gd}
-                        </span>
-                        {/* P */}
-                        <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:900,color: isQ?"#ea580c":"#374151",flexShrink:0}}>
-                          {tData.pts}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <ThirdsPanel
+                sortedThirdIds={bracket.sortedThirds}
+                qualifiedThirdIds={bracket.qualifiedThirds}
+                thirdsData={liveTableData.thirds}
+              />
             </div>
             {/* Bracket Wrapper - premium dark header */}
             <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.04)"}} ref={bracketPanelRef}>
@@ -2054,7 +2062,7 @@ export default function App() {
                 )}
               </div>
               <div className="bracket-scroll-wrapper" style={{padding:"14px",overflowX:"auto"}}>
-                <div style={{minWidth:"1200px"}}>
+                <div style={{minWidth:"1280px"}}>
                   <BracketView bracket={bracket} knockoutScores={knockoutScores} />
                 </div>
               </div>
@@ -2084,53 +2092,11 @@ export default function App() {
               <div style={{flex:1,minWidth:0,background:"#ffffff",border:"1px solid #e8edf3",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"}}>
                 <div className="groups-panel-grid">{renderOfficialGroups()}</div>
               </div>
-              <div className="thirds-panel" style={{flexShrink:0,background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"10px 12px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)",display:"flex",flexDirection:"column"}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>EN İYİ 3.LER</span>
-                  </div>
-                  <div style={{display:"flex",gap:0,alignItems:"center"}}>
-                    <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
-                    <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
-                  </div>
-                </div>
-                <div className="thirds-mobile-grid" style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
-                  {officialBracket.sortedThirds.map((id, index) => {
-                    const isQ = officialBracket.qualifiedThirds.includes(id);
-                    const gLetter = Object.keys(GROUPS_CONFIG).find(g => GROUPS_CONFIG[g].includes(id));
-                    const tData = officialOnlyTableData.thirds.find(x => x.id === id) || { pts: 0, gd: 0 };
-                    const leftAccent = isQ ? "#f97316" : "transparent";
-                    const rowBg = isQ ? "rgba(249,115,22,0.09)" : "transparent";
-                    const nameColor = isQ ? "#9a3412" : "#374151";
-                    const gdColor = tData.gd > 0 ? "#1d4ed8" : tData.gd < 0 ? "#dc2626" : "#94a3b8";
-                    const gdColorFinal = isQ ? gdColor : "#94a3b8";
-                    return (
-                      <div key={id} style={{
-                        display:"flex", alignItems:"center",
-                        background: rowBg,
-                        borderRadius: 6,
-                        borderLeft: `3px solid ${leftAccent}`,
-                        paddingLeft: 5, paddingRight: 4,
-                        paddingTop: 3, paddingBottom: 3,
-                        minHeight: 26,
-                      }}>
-                        <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isQ?"#ea580c":"#94a3b8",width:16,flexShrink:0,textAlign:"center"}}>{index+1}</span>
-                        <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
-                        <span style={{flex:1,fontSize:11.5,fontWeight: isQ?700:500,color:nameColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>
-                          {INITIAL_TEAMS[id]?.name} <span style={{fontSize:9,color: isQ?"#f97316":"#94a3b8",fontFamily:"var(--font-mono)",fontWeight:600}}>({gLetter})</span>
-                        </span>
-                        <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColorFinal,flexShrink:0}}>
-                          {tData.gd > 0 ? `+${tData.gd}` : tData.gd}
-                        </span>
-                        <span style={{width:24,textAlign:"center",fontSize:11.5,fontFamily:"var(--font-mono)",fontWeight:900,color: isQ?"#ea580c":"#374151",flexShrink:0}}>
-                          {tData.pts}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <ThirdsPanel
+                sortedThirdIds={officialBracket.sortedThirds}
+                qualifiedThirdIds={officialBracket.qualifiedThirds}
+                thirdsData={officialOnlyTableData.thirds}
+              />
             </div>
             <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.04)"}} ref={liveBracketPanelRef}>
               <div style={{background:"#f8fafc",borderBottom:"1px solid #e2e8f0",padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
@@ -2167,7 +2133,7 @@ export default function App() {
                 )}
               </div>
               <div className="bracket-scroll-wrapper" style={{padding:"14px",overflowX:"auto"}}>
-                <div style={{minWidth:"1200px"}}>
+                <div style={{minWidth:"1280px"}}>
                   <BracketView bracket={liveDisplayBracket} knockoutScores={officialKOScores} officialOnly={true} />
                 </div>
               </div>
@@ -2826,19 +2792,16 @@ export default function App() {
             return compareKnockoutProgress(a, b, simResults.teams, activeTeams);
           });
 
-          const half = Math.ceil(sortedIds.length / 2);
-          const leftIds = sortedIds.slice(0, half);
-          const rightIds = sortedIds.slice(half);
           const maxChamp = simResults.teams[sortedIds[0]]?.champion ?? 1;
 
-          const thBase = { padding:"7px 8px", textAlign:"center", fontWeight:800, fontSize:10, letterSpacing:"0.04em", textTransform:"uppercase", whiteSpace:"nowrap", background:"#0a0f1e", borderBottom:"2px solid rgba(255,255,255,0.08)", cursor:"pointer", userSelect:"none", transition:"background 0.15s" };
-          const tdBase = { padding:"6px 8px", textAlign:"center", fontFamily:"'JetBrains Mono',monospace", fontWeight:700, fontSize:11.5, whiteSpace:"nowrap" };
+          const thBase = { padding:"7px 6px", textAlign:"center", fontWeight:800, fontSize:10, letterSpacing:"0.04em", textTransform:"uppercase", whiteSpace:"nowrap", background:"#0a0f1e", borderBottom:"2px solid rgba(255,255,255,0.08)", cursor:"pointer", userSelect:"none", transition:"background 0.15s" };
+          const tdBase = { padding:"6px 5px", textAlign:"center", fontFamily:"'JetBrains Mono',monospace", fontWeight:700, fontSize:11, whiteSpace:"nowrap" };
 
-          const MatrixTable = ({ids, offset}) => (
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
+          const MatrixTable = ({ids, offset = 0}) => (
+            <table className="matrix-table" style={{width:"100%",borderCollapse:"collapse"}}>
               <thead style={{position:"sticky",top:0,zIndex:20}}>
                 <tr>
-                  <th style={{...thBase,textAlign:"left",padding:"7px 10px",minWidth:130,color:"rgba(255,255,255,0.5)",cursor:"default"}}>Takım</th>
+                  <th style={{...thBase,textAlign:"left",padding:"7px 8px",width:"28%",color:"rgba(255,255,255,0.5)",cursor:"default"}}>Takım</th>
                   {MATRIX_COLS.map((col) => (
                     <th
                       key={col.key}
@@ -2847,7 +2810,8 @@ export default function App() {
                         ...thBase,
                         color: col.color,
                         background: matrixSortCol === col.key ? "rgba(16,185,129,0.18)" : "#0a0f1e",
-                        minWidth: col.isChamp ? 80 : undefined,
+                        minWidth: col.isChamp ? undefined : undefined,
+                        width: col.isChamp ? "14%" : "10%",
                       }}
                       title={matrixSortCol === col.key ? "Varsayılan sıralamaya dön" : `${col.label} göre sırala`}
                     >
@@ -2874,7 +2838,7 @@ export default function App() {
                         <div style={{display:"flex",alignItems:"center",gap:7}}>
                           <span style={{fontSize:10,fontFamily:"monospace",color:"#94a3b8",fontWeight:700,minWidth:18,textAlign:"right"}}>{rowIdx+1}</span>
                           <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",boxShadow:"0 1px 2px rgba(0,0,0,0.1)",flexShrink:0}} alt="" />
-                          <span style={{fontWeight:700,color:"#0f172a",fontSize:12,whiteSpace:"nowrap"}}>{INITIAL_TEAMS[id]?.name}</span>
+                          <span className="matrix-team-name" style={{fontWeight:700,color:"#0f172a",fontSize:12,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{INITIAL_TEAMS[id]?.name}</span>
                         </div>
                       </td>
                       {MATRIX_COLS.map((col) => {
@@ -2882,12 +2846,12 @@ export default function App() {
                         const cellStyle = probCellStyle(val);
                         if (col.isChamp) {
                           return (
-                            <td key={col.key} style={{padding:"6px 8px", ...cellStyle}}>
+                            <td key={col.key} style={{padding:"6px 5px", ...cellStyle}}>
                               <div style={{display:"flex",alignItems:"center",gap:5,justifyContent:"flex-end"}}>
-                                <div style={{width:36,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                                <div className="matrix-champ-bar" style={{width:36,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
                                   <div style={{width:`${Math.min(100,(champPct/maxChamp)*100)}%`,height:"100%",background:isTop3?"linear-gradient(90deg,#d97706,#f59e0b)":"linear-gradient(90deg,#94a3b8,#cbd5e1)",borderRadius:2}}></div>
                                 </div>
-                                <span style={{fontFamily:"monospace",fontWeight:900,fontSize:12,minWidth:38,textAlign:"right",color:cellStyle.color}}>{val.toFixed(1)}%</span>
+                                <span className="matrix-champ-pct" style={{fontFamily:"monospace",fontWeight:900,fontSize:12,minWidth:38,textAlign:"right",color:cellStyle.color}}>{val.toFixed(1)}%</span>
                               </div>
                             </td>
                           );
@@ -2922,10 +2886,8 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1px 1fr",background:"#ffffff"}}>
-                <div style={{overflowX:"auto"}}><MatrixTable ids={leftIds} offset={0} /></div>
-                <div style={{background:"#e2e8f0"}}></div>
-                <div style={{overflowX:"auto"}}><MatrixTable ids={rightIds} offset={half} /></div>
+              <div className="matrix-wrap" style={{background:"#ffffff"}}>
+                <MatrixTable ids={sortedIds} offset={0} />
               </div>
             </div>
           );

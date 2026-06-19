@@ -103,6 +103,25 @@ body {
   color: #0f172a;
 }
 
+.match-card.has-slot-label {
+  min-height: auto;
+}
+
+.team-name.slot-label {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-all;
+  font-size: 8px;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+
+.match-row.slot-row {
+  align-items: flex-start;
+}
+
 .pct-badge {
   font-family: var(--font-mono);
   font-size: 10.5px;
@@ -310,9 +329,9 @@ body {
     width: 100%;
   }
   .thirds-mobile-grid {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px;
   }
 }
 
@@ -369,9 +388,9 @@ body {
     flex-direction: column;
   }
 
-  /* Groups grid */
-  .groups-panel-grid  { grid-template-columns: repeat(2, 1fr); gap: 7px; }
-  .score-entry-grid   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  /* Groups grid — mobilde tek sütun */
+  .groups-panel-grid  { grid-template-columns: 1fr; gap: 8px; }
+  .score-entry-grid   { grid-template-columns: 1fr; gap: 10px; }
 
   /* Group card daha kompakt */
   .group-card { padding: 8px 9px; }
@@ -384,11 +403,53 @@ body {
    KÜÇÜK MOBİL — ≤ 480px
    ============================================ */
 @media (max-width: 480px) {
-  .groups-panel-grid  { grid-template-columns: 1fr 1fr; gap: 6px; }
-  .score-entry-grid   { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .groups-panel-grid  { grid-template-columns: 1fr; gap: 6px; }
+  .score-entry-grid   { grid-template-columns: 1fr; gap: 8px; }
   .group-card { padding: 7px 8px; }
   .group-team-row { font-size: 11px; }
   .match-card { padding: 4px 6px; }
   .team-name  { font-size: 10px; }
+  .team-name.slot-label { font-size: 7.5px; }
   .pct-badge  { font-size: 9.5px; }
+}
+
+/* === OLASILIK MATRİSİ — tek tablo, mobil uyum === */
+.matrix-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.matrix-table th,
+.matrix-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .matrix-table th {
+    padding: 5px 3px !important;
+    font-size: 8px !important;
+    letter-spacing: 0 !important;
+  }
+  .matrix-table td {
+    padding: 4px 3px !important;
+    font-size: 9px !important;
+  }
+  .matrix-table .matrix-team-name {
+    font-size: 10px !important;
+  }
+  .matrix-table .matrix-champ-bar {
+    display: none !important;
+  }
+  .matrix-table .matrix-champ-pct {
+    font-size: 9px !important;
+    min-width: 0 !important;
+  }
 }
