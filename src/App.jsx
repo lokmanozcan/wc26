@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getFifaTargetThird } from "./fifaMatrix";
-import { buildScoresMap, compareBestThirdPlace, rankGroupByFifaRules, computeGroupPositionProbabilities } from "./fifaStandings";
+import { buildScoresMap, compareBestThirdPlace, rankGroupByFifaRules } from "./fifaStandings";
 import { buildTemplateOfficialBracket } from "./officialBracketTemplate";
 import { usePersistentState } from "./usePersistentState";
 
@@ -208,6 +208,41 @@ function simulateEloWeightedScore(eloHome, eloAway) {
   }
 
   return { home: validCombinations[validCombinations.length - 1].home, away: validCombinations[validCombinations.length - 1].away };
+}
+
+/** Grup pozisyon olasılıkları — yalnızca resmi skorlar sabit, kalan maçlar ELO ile simüle */
+function computeOfficialGroupPositionProbs(gTeams, gFixtures, officialScores, teams, simCount = 8000) {
+  const officialMap = buildScoresMap(gFixtures, (f) => {
+    const sc = officialScores[f.id];
+    if (sc && sc.home !== "" && sc.away !== "") return sc;
+    return null;
+  });
+  const remaining = gFixtures.filter((f) => !officialMap[f.id]);
+  const counts = Object.fromEntries(
+    gTeams.map((id) => [id, { 1: 0, 2: 0, 3: 0, 4: 0 }])
+  );
+
+  for (let s = 0; s < simCount; s++) {
+    const scenario = { ...officialMap };
+    remaining.forEach((f) => {
+      const { home, away } = simulateEloWeightedScore(teams[f.home].elo, teams[f.away].elo);
+      scenario[f.id] = { home: String(home), away: String(away) };
+    });
+    rankGroupByFifaRules(gTeams, gFixtures, scenario, teams).forEach((row, idx) => {
+      counts[row.id][idx + 1]++;
+    });
+  }
+
+  const probs = {};
+  gTeams.forEach((id) => {
+    probs[id] = {
+      g1: (counts[id][1] / simCount) * 100,
+      g2: (counts[id][2] / simCount) * 100,
+      g3: (counts[id][3] / simCount) * 100,
+      g4: (counts[id][4] / simCount) * 100,
+    };
+  });
+  return probs;
 }
 
 function probCellStyle(pct) {
@@ -1374,6 +1409,16 @@ export default function App() {
     Object.entries(INITIAL_TEAMS).map(([k,v]) => [k, { ...v, elo: customElo[k] ?? v.elo }])
   );
 
+  const officialGroupPosProbs = useMemo(() => {
+    if (activeTab !== "groupstats") return null;
+    const teams = Object.fromEntries(
+      Object.entries(INITIAL_TEAMS).map(([k, v]) => [k, { ...v, elo: customElo[k] ?? v.elo }])
+    );
+    const gTeams = GROUPS_CONFIG[activeGroupTab] || [];
+    const gFixtures = generateAllFixtures().filter((f) => f.group === activeGroupTab);
+    return computeOfficialGroupPositionProbs(gTeams, gFixtures, officialScores, teams);
+  }, [activeTab, activeGroupTab, officialScores, customElo]);
+
   // KESİN TABLO DURUMUNU HESAPLAYAN YAN ETKİ (Resmi skorlara ya da simüle skorlara göre tam sayılar üretir)
   useEffect(() => {
     if (!simResults || !singleDisplayScores) return;
@@ -2201,7 +2246,7 @@ export default function App() {
 
 
         {/* === GRUP ANALİZİ TAB === */}
-        {activeTab==="groupstats" && simResults && liveTableData.groups && (() => {
+        {activeTab==="groupstats" && officialOnlyTableData.groups && (() => {
           const groupKeys = Object.keys(GROUPS_CONFIG);
           const allGroupFixtures = generateAllFixtures();
 
@@ -2213,16 +2258,11 @@ export default function App() {
           const qualThirdIds = new Set((officialOnlyTableData.thirds||[]).slice(0,8).map(t=>t.id));
           const simRows = liveTableData.groups[gName] || [];
 
-          const groupScoresMap = buildScoresMap(gFixtures, (f) => {
-            const off = officialScores[f.id];
-            if (off && off.home !== "" && off.away !== "") return off;
-            return null;
-          });
-          const remainingCount = gFixtures.filter((f) => !groupScoresMap[f.id]).length;
-          const scenarioPosProbs =
-            remainingCount <= 7
-              ? computeGroupPositionProbabilities(gTeams, gFixtures, groupScoresMap, activeTeams)
-              : null;
+          const groupPosProbs = officialGroupPosProbs || {};
+          const remainingCount = gFixtures.filter((f) => {
+            const sc = officialScores[f.id];
+            return !(sc && sc.home !== "" && sc.away !== "");
+          }).length;
 
           const cardStyle = {background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 16px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"};
           const sectionTitle = (label, color="#047857") => (
@@ -2385,9 +2425,9 @@ export default function App() {
                 <div style={cardStyle}>
                   {sectionTitle(`GRUP ${gName} — POZİSYON OLASILIKLARI`,"#b45309")}
                   <div style={{marginBottom:10,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>
-                    {scenarioPosProbs
-                      ? `Yalnızca resmi skorlar + kalan ${remainingCount} maç senaryosu (G/B/M) · FIFA averaj kuralları`
-                      : "Yalnızca resmi skorlar + Monte Carlo simülasyonu (FIFA averaj kuralları)"}
+                    Anlık resmi puan durumu baz alınır · {remainingCount > 0
+                      ? `kalan ${remainingCount} maç ELO ile simüle (8.000×)`
+                      : "tüm maçlar resmi — kesin sıralama"} · FIFA averaj kuralları
                   </div>
                   <table style={{width:"100%",borderCollapse:"collapse"}}>
                     <thead>
@@ -2400,11 +2440,8 @@ export default function App() {
                     </thead>
                     <tbody>
                       {gTeams.map((id,ti)=>{
-                        const t = simResults.teams[id]||{};
-                        const sp = scenarioPosProbs?.[id];
-                        const vals=sp
-                          ? [sp.g1, sp.g2, sp.g3, sp.g4]
-                          : [t.g1??0,t.g2??0,t.g3??0,t.g4??0];
+                        const p = groupPosProbs[id] || {};
+                        const vals=[p.g1??0,p.g2??0,p.g3??0,p.g4??0];
                         const maxVal=Math.max(...vals);
                         return (
                           <tr key={id} style={{borderBottom:"1px solid #f8fafc",background:ti%2===0?"#ffffff":"#fafbfc"}}>
