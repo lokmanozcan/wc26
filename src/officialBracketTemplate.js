@@ -1,4 +1,4 @@
-import { getFifaTargetThird } from "./fifaMatrix";
+import { getFifaTargetThird, getThirdSlotPlaceholderLabel } from "./fifaMatrix";
 import {
   analyzeGroupClinch,
   areAllGroupsComplete,
@@ -23,15 +23,12 @@ function buildMatch(slotA, slotB) {
   };
 }
 
-function resolveThirdSlot(slotIdx, allComplete, slotMap, pendingGroups) {
+function resolveThirdSlot(slotIdx, allComplete, slotMap) {
   if (allComplete) {
     const id = slotMap[slotIdx];
     return id ? makeBracketSlot(id, null) : makeBracketSlot(null, "3?");
   }
-  const label = pendingGroups.length
-    ? pendingGroups.map((g) => `3${g}`).join("/")
-    : "3?";
-  return makeBracketSlot(null, label);
+  return makeBracketSlot(null, getThirdSlotPlaceholderLabel(slotIdx));
 }
 
 /**
@@ -55,9 +52,6 @@ export function buildTemplateOfficialBracket({
   });
 
   const allComplete = areAllGroupsComplete(fixtures, scoresMap);
-  const pendingThirdGroups = Object.keys(groupsConfig).filter(
-    (g) => !groupData[g].complete
-  );
 
   const pos = (g, p) =>
     resolveGroupPositionSlot(
@@ -97,7 +91,7 @@ export function buildTemplateOfficialBracket({
     }
   });
 
-  const third = (idx) => resolveThirdSlot(idx, allComplete, slotMap, pendingThirdGroups);
+  const third = (idx) => resolveThirdSlot(idx, allComplete, slotMap);
 
   const resolveMatchOfficial = (slotA, slotB) => {
     const idA = slotA.id;

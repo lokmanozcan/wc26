@@ -521,8 +521,25 @@ export function getFifaTargetThird(qualifiedLetters, slotIndex) {
   const key = qualifiedLetters.split("").sort().join("");
   const row = FIFA_ANNEX_C[key];
   if (!row) {
-    // Fallback: eğer anahtar bulunamazsa ilk geçerli harfi döndür
     return qualifiedLetters[slotIndex] || "A";
   }
   return row[slotIndex];
+}
+
+// FIFA resmi fikstür etiketleri — her 3.lük slotunda o maça gelebilecek gruplar
+// Slot: 0=1A(M79), 1=1B(M85), 2=1D(M81), 3=1E(M74), 4=1G(M82), 5=1I(M77), 6=1K(M87), 7=1L(M80)
+const THIRD_SLOT_LABELS = [
+  "3C/3E/3F/3H/3I",
+  "3E/3F/3G/3I/3J",
+  "3B/3E/3F/3I/3J",
+  "3A/3B/3C/3D/3F",
+  "3A/3E/3H/3I/3J",
+  "3C/3D/3F/3G/3H",
+  "3D/3E/3I/3J/3L",
+  "3E/3H/3I/3J/3K",
+];
+
+/** Kesinleşmemiş 3.lük slotu için resmi olası grup etiketi */
+export function getThirdSlotPlaceholderLabel(slotIndex) {
+  return THIRD_SLOT_LABELS[slotIndex] ?? "3?";
 }

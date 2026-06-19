@@ -413,12 +413,15 @@ body {
   .pct-badge  { font-size: 9.5px; }
 }
 
-/* === OLASILIK MATRİSİ — tek tablo, mobil uyum === */
+/* === OLASILIK MATRİSİ — masaüstü çift / mobil tek tablo === */
 .matrix-wrap {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+.matrix-desktop-layout { display: grid; }
+.matrix-mobile-layout { display: none; }
 
 .matrix-table {
   width: 100%;
@@ -433,6 +436,8 @@ body {
 }
 
 @media (max-width: 768px) {
+  .matrix-desktop-layout { display: none !important; }
+  .matrix-mobile-layout { display: block !important; }
   .matrix-table th {
     padding: 5px 3px !important;
     font-size: 8px !important;

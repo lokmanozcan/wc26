@@ -1095,36 +1095,36 @@ export default function App() {
       }
 
       // İki takım satırı
-      [[m?.idA, score?.home, actualWinner === m?.idA],
-       [m?.idB, score?.away, actualWinner === m?.idB]].forEach(([id, sc, isWin], ri) => {
+      [[m?.idA, m?.labelA, score?.home, actualWinner === m?.idA],
+       [m?.idB, m?.labelB, score?.away, actualWinner === m?.idB]].forEach(([id, label, sc, isWin], ri) => {
         const ry = y + ri * ROW_H + 2;
         const midY = ry + ROW_H / 2;
-        const nameText = INITIAL_TEAMS[id]?.name || "---";
+        const isSlotLabel = !id && label;
+        const nameText = label || INITIAL_TEAMS[id]?.name || "---";
 
         // Kazanan arka planı
         if (isWin) {
           ctx.fillStyle = "rgba(16,185,129,0.10)";
           roundRect(ctx, x + 2, ry, CARD_W - 4, ROW_H - 1, 4);
           ctx.fill();
-          // Sol accent çizgisi
           ctx.fillStyle = "#10b981";
           ctx.fillRect(x + 2, ry + 2, 2.5, ROW_H - 5);
         }
 
-        // Bayrak
-        const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
-        if (flag) ctx.drawImage(flag, x + 8, midY - 5.5, 16, 11);
+        if (!isSlotLabel) {
+          const flag = flagCache.current[INITIAL_TEAMS[id]?.iso?.toLowerCase()];
+          if (flag) ctx.drawImage(flag, x + 8, midY - 5.5, 16, 11);
+        }
 
-        // Takım adı (kırpma)
         ctx.save();
         ctx.beginPath();
-        ctx.rect(x + 28, ry, CARD_W - 28 - 22, ROW_H);
+        ctx.rect(x + (isSlotLabel ? 6 : 28), ry, CARD_W - (isSlotLabel ? 12 : 50), ROW_H);
         ctx.clip();
-        ctx.font = isWin ? "700 10px system-ui" : "500 10px system-ui";
-        ctx.fillStyle = isWin ? "#047857" : "#374151";
+        ctx.font = isSlotLabel ? "700 6.5px monospace" : (isWin ? "700 10px system-ui" : "500 10px system-ui");
+        ctx.fillStyle = isSlotLabel ? "#64748b" : (isWin ? "#047857" : "#374151");
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillText(nameText, x + 28, midY);
+        ctx.fillText(nameText, x + (isSlotLabel ? 6 : 28), midY);
         ctx.restore();
 
         // Skor veya yüzde
@@ -2082,7 +2082,15 @@ export default function App() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 GRUPLAR + 3.LER
               </button>
-              <button onClick={()=>downloadBracket({bracket:officialBracket,knockoutScores:officialKOScores,title:"2026 FIFA DÜNYA KUPASI — CANLI DURUM",officialOnly:true,filename:"canli_durum_agaci_wc26.png"})}
+              <button onClick={()=>downloadBracket({
+                bracket: liveDisplayBracket,
+                knockoutScores: officialKOScores,
+                title: liveBracketLiveMode
+                  ? "2026 FIFA DÜNYA KUPASI — CANLI DURUM"
+                  : "2026 FIFA DÜNYA KUPASI — KESİNLEŞEN YERLER",
+                officialOnly: true,
+                filename: liveBracketLiveMode ? "canli_durum_agaci_wc26.png" : "canli_durum_kesinlesen_wc26.png",
+              })}
                 style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",borderRadius:9,background:"linear-gradient(135deg,#10b981,#059669)",border:"none",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",boxShadow:"0 2px 8px rgba(5,150,105,0.35)",letterSpacing:"0.04em",fontFamily:"monospace"}}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 TURNUVA AĞACI
@@ -2793,6 +2801,9 @@ export default function App() {
           });
 
           const maxChamp = simResults.teams[sortedIds[0]]?.champion ?? 1;
+          const half = Math.ceil(sortedIds.length / 2);
+          const leftIds = sortedIds.slice(0, half);
+          const rightIds = sortedIds.slice(half);
 
           const thBase = { padding:"7px 6px", textAlign:"center", fontWeight:800, fontSize:10, letterSpacing:"0.04em", textTransform:"uppercase", whiteSpace:"nowrap", background:"#0a0f1e", borderBottom:"2px solid rgba(255,255,255,0.08)", cursor:"pointer", userSelect:"none", transition:"background 0.15s" };
           const tdBase = { padding:"6px 5px", textAlign:"center", fontFamily:"'JetBrains Mono',monospace", fontWeight:700, fontSize:11, whiteSpace:"nowrap" };
@@ -2886,7 +2897,12 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              <div className="matrix-wrap" style={{background:"#ffffff"}}>
+              <div className="matrix-desktop-layout" style={{display:"grid",gridTemplateColumns:"1fr 1px 1fr",background:"#ffffff"}}>
+                <div className="matrix-wrap"><MatrixTable ids={leftIds} offset={0} /></div>
+                <div style={{background:"#e2e8f0"}}></div>
+                <div className="matrix-wrap"><MatrixTable ids={rightIds} offset={half} /></div>
+              </div>
+              <div className="matrix-mobile-layout matrix-wrap" style={{background:"#ffffff"}}>
                 <MatrixTable ids={sortedIds} offset={0} />
               </div>
             </div>
