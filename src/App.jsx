@@ -714,8 +714,9 @@ export default function App() {
   );
 
   // --- Simülasyon önbelleği — DB'ye kaydedilir, sayfa yenilemede tekrar çalışmaz ---
-  const [simCache, setSimCache] = usePersistentState("simCache", { key: null, results: null });
+  const [simCache, setSimCache, simCacheLoaded] = usePersistentState("simCache", null);
   const [simResults, setSimResults] = useState(null);
+  const [simRunning, setSimRunning] = useState(false);
   const [singleDisplayScores, setSingleDisplayScores] = useState({});
   const [liveTableData, setLiveTableData] = useState({ groups: {}, thirds: [] });
   const [officialOnlyTableData, setOfficialOnlyTableData] = useState({ groups: {}, thirds: [] });
@@ -1425,31 +1426,6 @@ export default function App() {
     setOfficialOnlyTableData({ groups: groups2, thirds: sortedThirds2 });
   }, [officialScores]);
 
-  // Monte Carlo tetikleyici — officialScores veya ELO değişince çalışır,
-  // aynı girdiyle sayfa yenilenirse DB'deki cache'i kullanır (simülasyon çalışmaz)
-  useEffect(() => {
-    const cacheKey = JSON.stringify({ officialScores, customElo });
-
-    // 1) DB'deki cache aynı key ile eşleşiyorsa — doğrudan kullan
-    if (simCache && simCache.key === cacheKey && simCache.results) {
-      setSimResults(simCache.results);
-      if (simCache.results.displayScores) {
-        setSingleDisplayScores(simCache.results.displayScores);
-      }
-      return;
-    }
-
-    // 2) Girdi değişti veya cache yok — yeni simülasyon çalıştır
-    const results = runAdvancedSimulation(activeTeams, officialScores);
-    // DB'ye kaydet (bir sonraki sayfa açılışında bu sonuç kullanılır)
-    setSimCache({ key: cacheKey, results });
-    setSimResults(results);
-    if (results && results.displayScores) {
-      setSingleDisplayScores(results.displayScores);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [officialScores, customElo]);
-
   const handleScoreChange = (fixtureId, side, value) => {
     setUserScores(prev => ({ ...prev, [fixtureId]: { ...prev[fixtureId], [side]: value } }));
   };
@@ -1641,6 +1617,50 @@ export default function App() {
 
     return {teams:stats, matchups:matchupStats, encounters:encounterStats, displayScores:firstSimDisplayScores, bracketPath:firstSimBracketPath};
   }
+
+  const refreshSimulation = useCallback(() => {
+    if (simRunning) return;
+    setSimRunning(true);
+    window.setTimeout(() => {
+      try {
+        const results = runAdvancedSimulation(activeTeams, officialScores);
+        const payload = {
+          key: JSON.stringify({ officialScores, customElo }),
+          results,
+          updatedAt: Date.now(),
+        };
+        setSimCache(payload);
+        try {
+          localStorage.setItem("wc26_sim_cache", JSON.stringify(payload));
+        } catch (_) { /* ignore quota */ }
+        setSimResults(results);
+        if (results?.displayScores) setSingleDisplayScores(results.displayScores);
+      } finally {
+        setSimRunning(false);
+      }
+    }, 30);
+  }, [simRunning, activeTeams, officialScores, customElo, setSimCache]);
+
+  // İlk açılışta kayıtlı simülasyonu yükle — otomatik yeniden simüle etme
+  useEffect(() => {
+    if (!dbLoaded || !simCacheLoaded || simResults) return;
+
+    let cached = simCache?.results ? simCache : null;
+    if (!cached) {
+      try {
+        const raw = localStorage.getItem("wc26_sim_cache");
+        if (raw) cached = JSON.parse(raw);
+      } catch (_) { /* ignore */ }
+    }
+
+    if (cached?.results) {
+      setSimResults(cached.results);
+      if (cached.results.displayScores) {
+        setSingleDisplayScores(cached.results.displayScores);
+      }
+      if (!simCache?.results) setSimCache(cached);
+    }
+  }, [dbLoaded, simCacheLoaded, simCache, simResults, setSimCache]);
 
   const buildLiveBracket = () => {
     if (!simResults || !liveTableData.groups || Object.keys(liveTableData.groups).length === 0) return null;
@@ -1977,6 +1997,22 @@ export default function App() {
           </div>
         </div>
 
+        <button
+          onClick={refreshSimulation}
+          disabled={simRunning}
+          title={simCache?.updatedAt ? `Son simülasyon: ${new Date(simCache.updatedAt).toLocaleString("tr-TR")}` : "10.000× Monte Carlo simülasyonu çalıştır"}
+          style={{
+            display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:9, cursor: simRunning ? "wait" : "pointer",
+            border:"none", flexShrink:0,
+            background: simRunning ? "rgba(255,255,255,0.12)" : "linear-gradient(135deg,#10b981,#059669)",
+            color:"#fff", fontWeight:800, fontSize:10.5, fontFamily:"monospace", letterSpacing:"0.04em",
+            boxShadow: simRunning ? "none" : "0 2px 8px rgba(16,185,129,0.35)",
+            opacity: simRunning ? 0.75 : 1,
+          }}
+        >
+          {simRunning ? "⏳ Simüle..." : "🔄 Güncelle"}
+        </button>
+
         {/* Desktop nav */}
         <nav className="desktop-nav" style={{display:"flex",background:"rgba(255,255,255,0.06)",padding:3,borderRadius:11,border:"1px solid rgba(255,255,255,0.1)",gap:2}}>
           {[["bracket","Turnuva Ağacı"],["livestatus","Canlı Durum"],["groupstats","Grup Analizi"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["difficulty","Fikstür Zorluğu"],["elo","ELO Güncelle"]].map(([tab,label])=>(
@@ -2014,6 +2050,20 @@ export default function App() {
       )}
 
       <main style={{flex:1,padding:"12px 12px 32px",maxWidth:"100%",width:"100%"}}>
+
+        {simRunning && (
+          <div style={{marginBottom:12,background:"rgba(16,185,129,0.08)",border:"1px solid #10b981",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#047857",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{display:"inline-block",width:14,height:14,border:"2px solid #10b981",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />
+            10.000× Monte Carlo simülasyonu çalışıyor…
+          </div>
+        )}
+
+        {!simResults && !simRunning && activeTab !== "livestatus" && activeTab !== "elo" && (
+          <div style={{marginBottom:12,background:"#fffbeb",border:"1px solid #f59e0b",borderRadius:10,padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <span style={{fontSize:12,color:"#92400e",fontWeight:500}}>Henüz simülasyon yok. Tahmin ve olasılık verileri için <strong>Güncelle</strong> butonuna basın.</span>
+            <button onClick={refreshSimulation} style={{padding:"6px 14px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:"monospace"}}>🔄 Simülasyonu Başlat</button>
+          </div>
+        )}
 
         {/* === BRACKET TAB === */}
         {activeTab==="bracket" && bracket && (

@@ -55,7 +55,9 @@ function compareTeamsFifa(a, b, miniStats, overallStats, eloMap) {
   if (c !== 0) return c;
   c = compareOverallStats(overallStats[a], overallStats[b]);
   if (c !== 0) return c;
-  return getElo(eloMap, b) - getElo(eloMap, a);
+  c = getElo(eloMap, b) - getElo(eloMap, a);
+  if (c !== 0) return c;
+  return a.localeCompare(b);
 }
 
 function rankFifaSubset(subset, teamIds, fixtures, scoresByFixtureId, overallStats, eloMap) {
