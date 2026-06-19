@@ -2216,9 +2216,6 @@ export default function App() {
           const groupScoresMap = buildScoresMap(gFixtures, (f) => {
             const off = officialScores[f.id];
             if (off && off.home !== "" && off.away !== "") return off;
-            const usr = userScores[f.id];
-            if (usr && usr.home !== "" && usr.away !== "") return usr;
-            if (singleDisplayScores[f.id]) return singleDisplayScores[f.id];
             return null;
           });
           const remainingCount = gFixtures.filter((f) => !groupScoresMap[f.id]).length;
@@ -2389,8 +2386,8 @@ export default function App() {
                   {sectionTitle(`GRUP ${gName} — POZİSYON OLASILIKLARI`,"#b45309")}
                   <div style={{marginBottom:10,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>
                     {scenarioPosProbs
-                      ? `Kalan ${remainingCount} maç senaryosu × FIFA ikili/üçlü averaj + genel averaj`
-                      : "10.000× Monte Carlo simülasyonu (FIFA ikili/üçlü averaj + genel averaj)"}
+                      ? `Yalnızca resmi skorlar + kalan ${remainingCount} maç senaryosu (G/B/M) · FIFA averaj kuralları`
+                      : "Yalnızca resmi skorlar + Monte Carlo simülasyonu (FIFA averaj kuralları)"}
                   </div>
                   <table style={{width:"100%",borderCollapse:"collapse"}}>
                     <thead>
