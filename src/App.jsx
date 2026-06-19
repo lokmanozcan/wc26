@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { getFifaTargetThird } from "./fifaMatrix";
+import { buildScoresMap, compareBestThirdPlace, rankGroupByFifaRules } from "./fifaStandings";
+import { buildTemplateOfficialBracket } from "./officialBracketTemplate";
 import { usePersistentState } from "./usePersistentState";
 
 
@@ -208,12 +210,27 @@ function simulateEloWeightedScore(eloHome, eloAway) {
   return { home: validCombinations[validCombinations.length - 1].home, away: validCombinations[validCombinations.length - 1].away };
 }
 
+function probCellStyle(pct) {
+  const p = Math.max(0, Math.min(100, pct ?? 0));
+  if (p < 50) {
+    const t = (50 - p) / 50;
+    return { background: `rgba(239, 68, 68, ${(t * 0.42).toFixed(3)})`, color: p < 25 ? "#b91c1c" : "#dc2626" };
+  }
+  if (p > 50) {
+    const t = (p - 50) / 50;
+    return { background: `rgba(16, 185, 129, ${(t * 0.42).toFixed(3)})`, color: p > 75 ? "#047857" : "#059669" };
+  }
+  return { background: "transparent", color: "#64748b" };
+}
+
 // === MATCH CARD ===
 function MatchCard({ m, score, officialOnly = false }) {
+  const isLabelA = !m?.idA && m?.labelA;
+  const isLabelB = !m?.idB && m?.labelB;
   const flagA = INITIAL_TEAMS[m?.idA]?.iso;
   const flagB = INITIAL_TEAMS[m?.idB]?.iso;
-  const nameA = INITIAL_TEAMS[m?.idA]?.name || "---";
-  const nameB = INITIAL_TEAMS[m?.idB]?.name || "---";
+  const nameA = m?.labelA || INITIAL_TEAMS[m?.idA]?.name || "—";
+  const nameB = m?.labelB || INITIAL_TEAMS[m?.idB]?.name || "—";
 
   const hasScore = score && score.home !== "" && score.away !== "" && score.home !== undefined && score.away !== undefined;
   const sw = hasScore ? scoreWinner(score) : null;
@@ -227,8 +244,8 @@ function MatchCard({ m, score, officialOnly = false }) {
     <div className="match-card" style={{ position:"relative" }}>
       <div className={`match-row ${isWinnerA ? "winner" : "loser"}`}>
         <div style={{ display:"flex", alignItems:"center", gap:4, flex:1, minWidth:0 }}>
-          <img src={getFlagUrl(flagA)} style={flagStyle} alt="" />
-          <span className="team-name">{nameA}</span>
+          {!isLabelA && m?.idA && <img src={getFlagUrl(flagA)} style={flagStyle} alt="" />}
+          <span className="team-name" style={isLabelA ? { fontFamily:"var(--font-mono)", fontSize:10, fontWeight:700, color:"#64748b", letterSpacing:"0.04em" } : undefined}>{nameA}</span>
         </div>
         {hasScore ? (
           <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerA ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center", flexShrink:0 }}>
@@ -242,8 +259,8 @@ function MatchCard({ m, score, officialOnly = false }) {
       </div>
       <div className={`match-row ${isWinnerB ? "winner" : "loser"}`}>
         <div style={{ display:"flex", alignItems:"center", gap:4, flex:1, minWidth:0 }}>
-          <img src={getFlagUrl(flagB)} style={flagStyle} alt="" />
-          <span className="team-name">{nameB}</span>
+          {!isLabelB && m?.idB && <img src={getFlagUrl(flagB)} style={flagStyle} alt="" />}
+          <span className="team-name" style={isLabelB ? { fontFamily:"var(--font-mono)", fontSize:10, fontWeight:700, color:"#64748b", letterSpacing:"0.04em" } : undefined}>{nameB}</span>
         </div>
         {hasScore ? (
           <span style={{ fontFamily:"monospace", fontWeight:900, fontSize:11, color: isWinnerB ? "#047857" : "#94a3b8", minWidth:14, textAlign:"center", flexShrink:0 }}>
@@ -405,8 +422,8 @@ function BracketView({ bracket, knockoutScores, officialOnly = false }) {
             <div style={{padding:"10px 12px 12px"}}>
               {/* Finalistler */}
               {[
-                {id: bracket.finalMatch.idA, p: bracket.finalMatch.pA, isWinner: bracket.finalMatch.winner === bracket.finalMatch.idA},
-                {id: bracket.finalMatch.idB, p: bracket.finalMatch.pB, isWinner: bracket.finalMatch.winner === bracket.finalMatch.idB},
+                {id: bracket.finalMatch.idA, label: bracket.finalMatch.labelA, p: bracket.finalMatch.pA, isWinner: bracket.finalMatch.winner === bracket.finalMatch.idA},
+                {id: bracket.finalMatch.idB, label: bracket.finalMatch.labelB, p: bracket.finalMatch.pB, isWinner: bracket.finalMatch.winner === bracket.finalMatch.idB},
               ].map((t, i) => (
                 <div key={i}>
                   <div style={{
@@ -416,9 +433,9 @@ function BracketView({ bracket, knockoutScores, officialOnly = false }) {
                     border: t.isWinner ? "1px solid rgba(245,158,11,0.35)" : "1px solid rgba(255,255,255,0.06)",
                     marginBottom: i === 0 ? 4 : 0,
                   }}>
-                    <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{width:20,height:14,borderRadius:3,objectFit:"cover",flexShrink:0,boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}} alt="" />
-                    <span style={{flex:1,fontSize:11.5,fontWeight: t.isWinner?800:600,color: t.isWinner?"#fbbf24":"rgba(255,255,255,0.7)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {INITIAL_TEAMS[t.id]?.name||"---"}
+                    {t.id && !t.label && <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{width:20,height:14,borderRadius:3,objectFit:"cover",flexShrink:0,boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}} alt="" />}
+                    <span style={{flex:1,fontSize: t.label ? 10 : 11.5,fontFamily: t.label ? "var(--font-mono)" : "var(--font-sans)",fontWeight: t.isWinner?800:600,color: t.label ? "rgba(255,255,255,0.45)" : (t.isWinner?"#fbbf24":"rgba(255,255,255,0.7)"),overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {t.label || INITIAL_TEAMS[t.id]?.name || "—"}
                     </span>
                     {t.isWinner && (
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -480,8 +497,8 @@ function BracketView({ bracket, knockoutScores, officialOnly = false }) {
             </div>
             <div style={{padding:"8px 10px"}}>
               {[
-                {id:bracket.thirdPlaceMatch.idA, p:bracket.thirdPlaceMatch.pA, isWinner: bracket.thirdPlaceMatch.winner===bracket.thirdPlaceMatch.idA},
-                {id:bracket.thirdPlaceMatch.idB, p:bracket.thirdPlaceMatch.pB, isWinner: bracket.thirdPlaceMatch.winner===bracket.thirdPlaceMatch.idB},
+                {id:bracket.thirdPlaceMatch.idA, label: bracket.thirdPlaceMatch.labelA, p:bracket.thirdPlaceMatch.pA, isWinner: bracket.thirdPlaceMatch.winner===bracket.thirdPlaceMatch.idA},
+                {id:bracket.thirdPlaceMatch.idB, label: bracket.thirdPlaceMatch.labelB, p:bracket.thirdPlaceMatch.pB, isWinner: bracket.thirdPlaceMatch.winner===bracket.thirdPlaceMatch.idB},
               ].map((t,i) => (
                 <div key={i} style={{
                   display:"flex", alignItems:"center", gap:6,
@@ -489,9 +506,9 @@ function BracketView({ bracket, knockoutScores, officialOnly = false }) {
                   background: t.isWinner ? "rgba(124,58,237,0.07)" : "transparent",
                   marginBottom: i===0 ? 3 : 0,
                 }}>
-                  <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}} alt="" />
-                  <span style={{flex:1,fontSize:11,fontWeight: t.isWinner?700:500,color: t.isWinner?"#5b21b6":"#374151",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {INITIAL_TEAMS[t.id]?.name||"---"}
+                  {t.id && !t.label && <img src={getFlagUrl(INITIAL_TEAMS[t.id]?.iso)} style={{width:18,height:13,borderRadius:2,objectFit:"cover",flexShrink:0,boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}} alt="" />}
+                  <span style={{flex:1,fontSize: t.label ? 10 : 11,fontFamily: t.label ? "var(--font-mono)" : "var(--font-sans)",fontWeight: t.isWinner?700:500,color: t.label ? "#94a3b8" : (t.isWinner?"#5b21b6":"#374151"),overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {t.label || INITIAL_TEAMS[t.id]?.name || "—"}
                   </span>
                   {t.isWinner && <svg width="10" height="10" viewBox="0 0 24 24" fill="#7c3aed"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>}
                   {!officialOnly && (
@@ -744,11 +761,13 @@ export default function App() {
       ctx.textBaseline = "middle";
       ctx.fillText(`GRUP ${gName}`, cx + CARD_PAD, cy + 14);
 
-      // AV / P başlıkları
+      // O / AV / P başlıkları
       ctx.font      = "bold 9px monospace";
-      ctx.fillStyle = "#1d4ed8";
+      ctx.fillStyle = "#64748b";
       ctx.textAlign = "right";
-      ctx.fillText("AV", cx + CARD_W - 26, cy + 14);
+      ctx.fillText("O",  cx + CARD_W - 54, cy + 14);
+      ctx.fillStyle = "#1d4ed8";
+      ctx.fillText("AV", cx + CARD_W - 32, cy + 14);
       ctx.fillStyle = "#0f172a";
       ctx.fillText("P",  cx + CARD_W - CARD_PAD, cy + 14);
       ctx.textAlign = "left";
@@ -802,12 +821,17 @@ export default function App() {
         ctx.textAlign = "left";
         ctx.fillText(INITIAL_TEAMS[id]?.name || "", cx + 43, midY);
 
+        // O
+        ctx.font      = "600 10px monospace";
+        ctx.fillStyle = "#64748b";
+        ctx.textAlign = "right";
+        ctx.fillText(String(item.played ?? 0), cx + CARD_W - 54, midY);
+
         // AV
         const gd = item.gd;
         ctx.font      = "700 11px monospace";
         ctx.fillStyle = gd > 0 ? "#1d4ed8" : gd < 0 ? "#dc2626" : "#94a3b8";
-        ctx.textAlign = "right";
-        ctx.fillText(gd > 0 ? `+${gd}` : String(gd), cx + CARD_W - 26, midY);
+        ctx.fillText(gd > 0 ? `+${gd}` : String(gd), cx + CARD_W - 32, midY);
 
         // P
         ctx.font      = "900 11.5px monospace";
@@ -1273,6 +1297,8 @@ export default function App() {
   }, []);
   const [eloSearch, setEloSearch] = useState("");
   const [groupsSection, setGroupsSection] = useState("groups");
+  const [liveBracketLiveMode, setLiveBracketLiveMode] = useState(true);
+  const [matrixSortCol, setMatrixSortCol] = useState(null);
   const [activeGroupTab, setActiveGroupTab] = useState("A");
   const [selectedTeamForEncounter, setSelectedTeamForEncounter] = useState(null);
   const [encounterRoundFilter, setEncounterRoundFilter] = useState("all");
@@ -1286,82 +1312,51 @@ export default function App() {
   useEffect(() => {
     if (!simResults || !singleDisplayScores) return;
 
-    const points = {}; const gd = {}; const gf = {};
-    Object.keys(activeTeams).forEach(id => { points[id] = 0; gd[id] = 0; gf[id] = 0; });
-
     const fixtures = generateAllFixtures();
-    fixtures.forEach(f => {
+    const scoresMap = buildScoresMap(fixtures, (f) => {
       const officialSc = officialScores[f.id];
       const userSc = userScores[f.id];
-      let hG = 0; let aG = 0;
-
-      if (officialSc && officialSc.home !== "" && officialSc.away !== "") {
-        // Resmi sonuç (R tuşuyla onaylanmış) — kesin olarak kullan
-        hG = parseInt(officialSc.home) || 0;
-        aG = parseInt(officialSc.away) || 0;
-      } else if (userSc && userSc.home !== "" && userSc.away !== "") {
-        // Kullanıcı tahmini — tabloya yansıt (ama olasılıkları etkilemiyor)
-        hG = parseInt(userSc.home) || 0;
-        aG = parseInt(userSc.away) || 0;
-      } else if (singleDisplayScores[f.id]) {
-        hG = singleDisplayScores[f.id].home;
-        aG = singleDisplayScores[f.id].away;
-      }
-
-      gf[f.home] += hG; gf[f.away] += aG;
-      gd[f.home] += (hG - aG); gd[f.away] += (aG - hG);
-      
-      if (hG > aG) points[f.home] += 3;
-      else if (aG > hG) points[f.away] += 3;
-      else { points[f.home] += 1; points[f.away] += 1; }
+      if (officialSc && officialSc.home !== "" && officialSc.away !== "") return officialSc;
+      if (userSc && userSc.home !== "" && userSc.away !== "") return userSc;
+      if (singleDisplayScores[f.id]) return singleDisplayScores[f.id];
+      return null;
     });
 
     const groupsOutput = {};
     const thirdsOutput = [];
 
     Object.entries(GROUPS_CONFIG).forEach(([gName, gTeams]) => {
-      const sorted = [...gTeams].sort((a, b) => 
-        points[b] - points[a] || gd[b] - gd[a] || gf[b] - gf[a] || activeTeams[b].elo - activeTeams[a].elo
-      );
-      groupsOutput[gName] = sorted.map(id => ({ id, pts: points[id], gd: gd[id], gf: gf[id] }));
-      thirdsOutput.push({ id: sorted[2], group: gName, pts: points[sorted[2]], gd: gd[sorted[2]], gf: gf[sorted[2]] });
+      const gFixtures = fixtures.filter((f) => f.group === gName);
+      const sorted = rankGroupByFifaRules(gTeams, gFixtures, scoresMap, activeTeams);
+      groupsOutput[gName] = sorted;
+      const third = sorted[2];
+      if (third) thirdsOutput.push({ id: third.id, group: gName, pts: third.pts, gd: third.gd, gf: third.gf, played: third.played });
     });
 
-    const sortedThirds = thirdsOutput.sort((a, b) => 
-      b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || activeTeams[b.id].elo - activeTeams[a.id].elo
-    );
+    const sortedThirds = thirdsOutput.sort((a, b) => compareBestThirdPlace(a, b, activeTeams));
 
     setLiveTableData({ groups: groupsOutput, thirds: sortedThirds });
   }, [userScores, officialScores, singleDisplayScores, simResults]);
 
   // SADECE RESMİ ONAYLANAN SKORLARDAN OLUŞAN TABLO (Anlık Puan Durumu)
   useEffect(() => {
-    const points2 = {}; const gd2 = {}; const gf2 = {};
-    Object.keys(activeTeams).forEach(id => { points2[id] = 0; gd2[id] = 0; gf2[id] = 0; });
     const fixtures2 = generateAllFixtures();
-    fixtures2.forEach(f => {
+    const scoresMap2 = buildScoresMap(fixtures2, (f) => {
       const sc = officialScores[f.id];
-      if (!sc || sc.home === "" || sc.away === "") return;
-      const hG = parseInt(sc.home) || 0;
-      const aG = parseInt(sc.away) || 0;
-      gf2[f.home] += hG; gf2[f.away] += aG;
-      gd2[f.home] += (hG - aG); gd2[f.away] += (aG - hG);
-      if (hG > aG) points2[f.home] += 3;
-      else if (aG > hG) points2[f.away] += 3;
-      else { points2[f.home] += 1; points2[f.away] += 1; }
+      if (sc && sc.home !== "" && sc.away !== "") return sc;
+      return null;
     });
+
     const groups2 = {};
     const thirds2 = [];
     Object.entries(GROUPS_CONFIG).forEach(([gName, gTeams]) => {
-      const sorted2 = [...gTeams].sort((a, b) =>
-        points2[b] - points2[a] || gd2[b] - gd2[a] || gf2[b] - gf2[a] || activeTeams[b].elo - activeTeams[a].elo
-      );
-      groups2[gName] = sorted2.map(id => ({ id, pts: points2[id], gd: gd2[id], gf: gf2[id] }));
-      thirds2.push({ id: sorted2[2], group: gName, pts: points2[sorted2[2]], gd: gd2[sorted2[2]], gf: gf2[sorted2[2]] });
+      const gFixtures = fixtures2.filter((f) => f.group === gName);
+      const sorted2 = rankGroupByFifaRules(gTeams, gFixtures, scoresMap2, activeTeams);
+      groups2[gName] = sorted2;
+      const third = sorted2[2];
+      if (third) thirds2.push({ id: third.id, group: gName, pts: third.pts, gd: third.gd, gf: third.gf, played: third.played });
     });
-    const sortedThirds2 = thirds2.sort((a, b) =>
-      b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || activeTeams[b.id].elo - activeTeams[a.id].elo
-    );
+    const sortedThirds2 = thirds2.sort((a, b) => compareBestThirdPlace(a, b, activeTeams));
     setOfficialOnlyTableData({ groups: groups2, thirds: sortedThirds2 });
   }, [officialScores]);
 
@@ -1460,15 +1455,14 @@ export default function App() {
     const fixtures = generateAllFixtures();
 
     for (let sim = 0; sim < SIM_COUNT; sim++) {
-      const points={}; const gd={}; const gf={};
-      Object.keys(teams).forEach(id => { points[id]=0; gd[id]=0; gf[id]=0; });
-      
+      const simScoresMap = {};
+
       fixtures.forEach(f => {
-        const saved = officialScores[f.id]; // Sadece resmi onaylı skorlar simülasyonu kilitler
+        const saved = officialScores[f.id];
         let hG = 0; let aG = 0;
 
         if (saved && saved.home !== "" && saved.away !== "") {
-          hG = parseInt(saved.home) || 0; 
+          hG = parseInt(saved.home) || 0;
           aG = parseInt(saved.away) || 0;
         } else {
           const simScore = simulateEloWeightedScore(teams[f.home].elo, teams[f.away].elo);
@@ -1480,25 +1474,24 @@ export default function App() {
           }
         }
 
-        points[f.home] += (hG > aG) ? 3 : (hG === aG ? 1 : 0);
-        points[f.away] += (aG > hG) ? 3 : (hG === aG ? 1 : 0);
-        gf[f.home] += hG; gf[f.away] += aG; 
-        gd[f.home] += (hG - aG); gd[f.away] += (aG - hG);
+        simScoresMap[f.id] = { home: hG, away: aG };
       });
 
       const winners={}; const runners={}; const thirds=[];
       Object.entries(GROUPS_CONFIG).forEach(([gName,gTeams]) => {
-        const sorted=[...gTeams].sort((a,b)=>points[b]-points[a]||gd[b]-gd[a]||gf[b]-gf[a]||teams[b].elo-teams[a].elo);
+        const gFixtures = fixtures.filter(f => f.group === gName);
+        const sortedRows = rankGroupByFifaRules(gTeams, gFixtures, simScoresMap, teams);
+        const sorted = sortedRows.map(r => r.id);
         winners[gName]=sorted[0]; runners[gName]=sorted[1];
-        thirds.push({id:sorted[2],group:gName,pts:points[sorted[2]],gd:gd[sorted[2]],gf:gf[sorted[2]],elo:teams[sorted[2]].elo});
-        // Grup bitiş pozisyonu istatistikleri
+        const t3 = sortedRows[2];
+        thirds.push({id:sorted[2],group:gName,pts:t3.pts,gd:t3.gd,gf:t3.gf,elo:teams[sorted[2]].elo});
         if(stats[sorted[0]])stats[sorted[0]].g1++;
         if(stats[sorted[1]])stats[sorted[1]].g2++;
         if(stats[sorted[2]])stats[sorted[2]].g3++;
         if(stats[sorted[3]])stats[sorted[3]].g4++;
       });
 
-      const bestThirds = [...thirds].sort((a,b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || b.elo - a.elo);
+      const bestThirds = [...thirds].sort((a,b) => compareBestThirdPlace(a, b, teams));
       const qualifiedThirds = bestThirds.slice(0,8); // Değişkeni burada tanımlıyoruz
       
       // Şimdi qualifiedThirds artık erişilebilir durumda
@@ -1526,7 +1519,8 @@ export default function App() {
       // Grup bitiş pozisyonları (her takım için bu simdeki sıra)
       const groupPos = {};
       Object.entries(GROUPS_CONFIG).forEach(([gName, gTeams]) => {
-        const sorted = [...gTeams].sort((a,b) => points[b]-points[a] || gd[b]-gd[a] || gf[b]-gf[a] || teams[b].elo-teams[a].elo);
+        const gFixtures = fixtures.filter(f => f.group === gName);
+        const sorted = rankGroupByFifaRules(gTeams, gFixtures, simScoresMap, teams).map(r => r.id);
         sorted.forEach((id, i) => { groupPos[id] = i + 1; });
       });
 
@@ -1729,8 +1723,26 @@ export default function App() {
     return { left_r32, left_r16, left_qf, left_sf, right_r32, right_r16, right_qf, right_sf, finalMatch, thirdPlaceMatch, sortedThirds, qualifiedThirds };
   };
 
+  const buildOfficialTemplateBracketView = () => {
+    const fixtures = generateAllFixtures();
+    const scoresMap = buildScoresMap(fixtures, (f) => {
+      const sc = officialScores[f.id];
+      if (sc && sc.home !== "" && sc.away !== "") return sc;
+      return null;
+    });
+    return buildTemplateOfficialBracket({
+      groupsConfig: GROUPS_CONFIG,
+      fixtures,
+      scoresMap,
+      eloMap: activeTeams,
+      getOfficialKOWinner,
+    });
+  };
+
   const bracket = buildLiveBracket();
   const officialBracket = buildOfficialOnlyBracket();
+  const officialTemplateBracket = buildOfficialTemplateBracketView();
+  const liveDisplayBracket = liveBracketLiveMode ? officialBracket : officialTemplateBracket;
   const allFixtures = generateAllFixtures();
 
   const renderGroups = () => {
@@ -1744,6 +1756,7 @@ export default function App() {
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
             <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>GRUP {gName}</span>
             <div style={{display:"flex",gap:0,alignItems:"center"}}>
+              <span style={{fontSize:10,fontWeight:800,color:"#64748b",fontFamily:"var(--font-mono)",width:18,textAlign:"center",letterSpacing:"0.04em"}}>O</span>
               <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
               <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
             </div>
@@ -1789,6 +1802,9 @@ export default function App() {
                   <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
                   {/* İsim */}
                   <span style={{flex:1,fontSize:12,fontWeight,color:nameColor,whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>{INITIAL_TEAMS[id]?.name}</span>
+                  <span style={{width:18,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:600,color:"#64748b",flexShrink:0}}>
+                    {item.played ?? 0}
+                  </span>
                   {/* AV */}
                   <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColor,flexShrink:0}}>
                     {item.gd > 0 ? `+${item.gd}` : item.gd}
@@ -1816,6 +1832,7 @@ export default function App() {
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:6}}>
             <span style={{fontSize:10.5,fontWeight:900,color:"#047857",letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"var(--font-sans)"}}>GRUP {gName}</span>
             <div style={{display:"flex",gap:0,alignItems:"center"}}>
+              <span style={{fontSize:10,fontWeight:800,color:"#64748b",fontFamily:"var(--font-mono)",width:18,textAlign:"center",letterSpacing:"0.04em"}}>O</span>
               <span style={{fontSize:10,fontWeight:800,color:"#1d4ed8",fontFamily:"var(--font-mono)",width:32,textAlign:"center",letterSpacing:"0.04em"}}>AV</span>
               <span style={{fontSize:10,fontWeight:800,color:"#0f172a",fontFamily:"var(--font-mono)",width:24,textAlign:"center",letterSpacing:"0.04em"}}>P</span>
             </div>
@@ -1857,6 +1874,9 @@ export default function App() {
                   <span style={{fontSize:9.5,fontFamily:"var(--font-mono)",fontWeight:700,color: isTop2?"#059669": isQThird?"#ea580c":"#cbd5e1",width:12,flexShrink:0,textAlign:"center"}}>{index+1}</span>
                   <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover",flexShrink:0,margin:"0 5px 0 4px",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}} alt="" />
                   <span style={{flex:1,fontSize:12,fontWeight,color:nameColor,whiteSpace:"nowrap",fontFamily:"var(--font-sans)"}}>{INITIAL_TEAMS[id]?.name}</span>
+                  <span style={{width:18,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:600,color:"#64748b",flexShrink:0}}>
+                    {item.played ?? 0}
+                  </span>
                   <span style={{width:32,textAlign:"center",fontSize:11,fontFamily:"var(--font-mono)",fontWeight:700,color:gdColor,flexShrink:0}}>
                     {item.gd > 0 ? `+${item.gd}` : item.gd}
                   </span>
@@ -2043,7 +2063,7 @@ export default function App() {
         )}
 
         {/* === CANLI DURUM TAB === */}
-        {activeTab==="livestatus" && officialBracket && (
+        {activeTab==="livestatus" && liveDisplayBracket && (
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid #10b981",borderRadius:10,padding:"8px 14px",fontSize:11.5,color:"#047857",fontWeight:500}}>
               📡 Bu sayfa yalnızca resmi onaylanmış skorları baz alır. Tahmin ve simülasyon sonuçları dahil edilmez; turnuvanın anlık gerçek durumunu gösterir.
@@ -2113,6 +2133,25 @@ export default function App() {
               </div>
             </div>
             <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.04)"}} ref={liveBracketPanelRef}>
+              <div style={{background:"#f8fafc",borderBottom:"1px solid #e2e8f0",padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:"#64748b",fontWeight:500}}>
+                  {liveBracketLiveMode ? "Anlık resmi skorlara göre eşleşmeler" : "Yalnızca kesinleşen yerler + kural etiketleri (1A, 2B, 3A/3B…)"}
+                </span>
+                <button
+                  onClick={() => setLiveBracketLiveMode((v) => !v)}
+                  style={{
+                    display:"flex", alignItems:"center", gap:8, padding:"6px 12px", borderRadius:9, cursor:"pointer", border:"none",
+                    background: liveBracketLiveMode ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#64748b,#475569)",
+                    color:"#fff", fontWeight:800, fontSize:11, fontFamily:"monospace", letterSpacing:"0.04em",
+                    boxShadow: liveBracketLiveMode ? "0 2px 8px rgba(16,185,129,0.3)" : "0 2px 8px rgba(71,85,105,0.25)",
+                  }}
+                >
+                  <span style={{width:28,height:14,borderRadius:7,background:"rgba(0,0,0,0.2)",position:"relative",display:"inline-block"}}>
+                    <span style={{position:"absolute",top:2,left: liveBracketLiveMode ? 16 : 2,width:10,height:10,borderRadius:"50%",background:"#fff",transition:"left 0.2s"}} />
+                  </span>
+                  {liveBracketLiveMode ? "ANLIK EŞLEŞME" : "KESİNLEŞEN YERLER"}
+                </button>
+              </div>
               <div style={{background:"#0a0f1e",padding:"10px 14px",display:"flex",justifyContent:"space-between",gap:"8px",alignItems:"center"}}>
                 {[["SON 32","rgba(255,255,255,0.4)"],["SON 16","rgba(255,255,255,0.5)"],["ÇEYREK F.","rgba(255,255,255,0.65)"],["YARI F.","rgba(255,255,255,0.8)"],null,["YARI F.","rgba(255,255,255,0.8)"],["ÇEYREK F.","rgba(255,255,255,0.65)"],["SON 16","rgba(255,255,255,0.5)"],["SON 32","rgba(255,255,255,0.4)"]].map((item, i) => 
                   item === null ? (
@@ -2129,7 +2168,7 @@ export default function App() {
               </div>
               <div className="bracket-scroll-wrapper" style={{padding:"14px",overflowX:"auto"}}>
                 <div style={{minWidth:"1200px"}}>
-                  <BracketView bracket={officialBracket} knockoutScores={officialKOScores} officialOnly={true} />
+                  <BracketView bracket={liveDisplayBracket} knockoutScores={officialKOScores} officialOnly={true} />
                 </div>
               </div>
             </div>
@@ -2148,22 +2187,7 @@ export default function App() {
           const gFixtures = allGroupFixtures.filter(f => f.group === gName);
           const liveRows = (officialOnlyTableData.groups[gName]) || [];
           const qualThirdIds = new Set((officialOnlyTableData.thirds||[]).slice(0,8).map(t=>t.id));
-
-          // Simüle puan durumu (officialScores > userScores > singleDisplayScores)
-          const simPts={}, simGd={}, simGf={};
-          gTeams.forEach(id=>{simPts[id]=0;simGd[id]=0;simGf[id]=0;});
-          gFixtures.forEach(f=>{
-            const oSc=officialScores[f.id], uSc=userScores[f.id], sSc=singleDisplayScores[f.id];
-            let sc={};
-            if(oSc && oSc.home !== "" && oSc.away !== "") { sc=oSc; }
-            else if(uSc && uSc.home !== "" && uSc.away !== "") { sc=uSc; }
-            else if(sSc) { sc=sSc; }
-            const h=parseInt(sc.home)||0, a=parseInt(sc.away)||0;
-            if(h>a){simPts[f.home]+=3;}else if(a>h){simPts[f.away]+=3;}else{simPts[f.home]+=1;simPts[f.away]+=1;}
-            simGd[f.home]+=(h-a); simGd[f.away]+=(a-h);
-            simGf[f.home]+=h; simGf[f.away]+=a;
-          });
-          const simSorted=[...gTeams].sort((a,b)=>simPts[b]-simPts[a]||simGd[b]-simGd[a]||simGf[b]-simGf[a]||activeTeams[b].elo-activeTeams[a].elo);
+          const simRows = liveTableData.groups[gName] || [];
 
           const cardStyle = {background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 16px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"};
           const sectionTitle = (label, color="#047857") => (
@@ -2300,20 +2324,22 @@ export default function App() {
                 {/* 3. Simüle Puan Durumu */}
                 <div style={cardStyle}>
                   {sectionTitle(`GRUP ${gName} — SİMÜLE PUAN DURUMU`,"#7c3aed")}
-                  <div style={{marginBottom:8,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>Resmi + Tahmin + Monte Carlo simülasyon skorlarıyla oluşturulan beklenen tablo</div>
+                  <div style={{marginBottom:8,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>Resmi + Tahmin + Monte Carlo simülasyon skorlarıyla oluşturulan beklenen tablo (FIFA averaj kuralları)</div>
                   <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                    {simSorted.map((id,idx)=>{
+                    {simRows.map((row,idx)=>{
+                      const id = row.id;
                       const isTop2=idx<2,isThird=idx===2;
                       const bg=isTop2?"rgba(16,185,129,0.07)":isThird?"rgba(249,115,22,0.07)":"transparent";
                       const accent=isTop2?"#10b981":isThird?"#f97316":"transparent";
-                      const gdClr=simGd[id]>0?"#1d4ed8":simGd[id]<0?"#dc2626":"#94a3b8";
+                      const gdClr=row.gd>0?"#1d4ed8":row.gd<0?"#dc2626":"#94a3b8";
                       return (
                         <div key={id} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px 5px 10px",borderRadius:8,background:bg,borderLeft:`3px solid ${accent}`}}>
                           <span style={{fontSize:10,fontFamily:"monospace",color:isTop2?"#059669":isThird?"#ea580c":"#cbd5e1",fontWeight:700,minWidth:14}}>{idx+1}</span>
                           <img src={getFlagUrl(INITIAL_TEAMS[id]?.iso)} style={{width:17,height:12,borderRadius:2,objectFit:"cover"}} alt="" />
                           <span style={{flex:1,fontSize:12,fontWeight:isTop2||isThird?700:500,color:isTop2?"#065f46":isThird?"#9a3412":"#374151"}}>{INITIAL_TEAMS[id]?.name}</span>
-                          <span style={{fontSize:11,fontFamily:"monospace",fontWeight:700,color:gdClr,minWidth:32,textAlign:"center"}}>{simGd[id]>0?`+${simGd[id]}`:simGd[id]}</span>
-                          <span style={{fontSize:13,fontFamily:"monospace",fontWeight:900,color:isTop2?"#047857":isThird?"#ea580c":"#0f172a",minWidth:24,textAlign:"center"}}>{simPts[id]}</span>
+                          <span style={{fontSize:10,fontFamily:"monospace",fontWeight:600,color:"#94a3b8",minWidth:18,textAlign:"center"}}>{row.played ?? 0}</span>
+                          <span style={{fontSize:11,fontFamily:"monospace",fontWeight:700,color:gdClr,minWidth:32,textAlign:"center"}}>{row.gd>0?`+${row.gd}`:row.gd}</span>
+                          <span style={{fontSize:13,fontFamily:"monospace",fontWeight:900,color:isTop2?"#047857":isThird?"#ea580c":"#0f172a",minWidth:24,textAlign:"center"}}>{row.pts}</span>
                         </div>
                       );
                     })}
@@ -2781,31 +2807,56 @@ export default function App() {
 
         {/* === MATRIX TAB === */}
         {activeTab==="matrix" && simResults && (() => {
-          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a, b) =>
-            compareKnockoutProgress(a, b, simResults.teams, activeTeams)
-          );
+          const MATRIX_COLS = [
+            { key: "r32", label: "S32", color: "#10b981" },
+            { key: "r16", label: "S16", color: "rgba(255,255,255,0.6)" },
+            { key: "qf", label: "ÇF", color: "rgba(255,255,255,0.7)" },
+            { key: "sf", label: "YF", color: "#38bdf8" },
+            { key: "f", label: "F", color: "#a78bfa" },
+            { key: "champion", label: "ŞAMPİYON", color: "#f59e0b", isChamp: true },
+          ];
+
+          const sortedIds = Object.keys(INITIAL_TEAMS).sort((a, b) => {
+            if (matrixSortCol) {
+              const tA = simResults.teams[a] || {};
+              const tB = simResults.teams[b] || {};
+              const diff = (tB[matrixSortCol] ?? 0) - (tA[matrixSortCol] ?? 0);
+              if (diff !== 0) return diff;
+            }
+            return compareKnockoutProgress(a, b, simResults.teams, activeTeams);
+          });
+
           const half = Math.ceil(sortedIds.length / 2);
           const leftIds = sortedIds.slice(0, half);
           const rightIds = sortedIds.slice(half);
           const maxChamp = simResults.teams[sortedIds[0]]?.champion ?? 1;
 
-          const thCls = (color) => ({padding:"7px 8px",textAlign:"center",fontWeight:800,fontSize:10,color,letterSpacing:"0.04em",textTransform:"uppercase",whiteSpace:"nowrap",background:"#0a0f1e",borderBottom:"2px solid rgba(255,255,255,0.08)"});
-          const tdCls = (color, bold) => ({padding:"6px 8px",textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:bold?700:600,color,fontSize:11.5,whiteSpace:"nowrap"});
+          const thBase = { padding:"7px 8px", textAlign:"center", fontWeight:800, fontSize:10, letterSpacing:"0.04em", textTransform:"uppercase", whiteSpace:"nowrap", background:"#0a0f1e", borderBottom:"2px solid rgba(255,255,255,0.08)", cursor:"pointer", userSelect:"none", transition:"background 0.15s" };
+          const tdBase = { padding:"6px 8px", textAlign:"center", fontFamily:"'JetBrains Mono',monospace", fontWeight:700, fontSize:11.5, whiteSpace:"nowrap" };
 
           const MatrixTable = ({ids, offset}) => (
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead style={{position:"sticky",top:0,zIndex:20}}>
                 <tr>
-                  <th style={{...thCls("rgba(255,255,255,0.5)"),textAlign:"left",padding:"7px 10px",minWidth:130}}>Takım</th>
-                  <th style={thCls("#10b981")}>S32</th>
-                  <th style={thCls("rgba(255,255,255,0.6)")}>S16</th>
-                  <th style={thCls("rgba(255,255,255,0.7)")}>ÇF</th>
-                  <th style={thCls("#38bdf8")}>YF</th>
-                  <th style={thCls("#a78bfa")}>F</th>
-                  <th style={{...thCls("#f59e0b"),minWidth:80}}>
-                    <svg style={{verticalAlign:"middle",marginRight:3}} width="9" height="9" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                    ŞAMPİYON
-                  </th>
+                  <th style={{...thBase,textAlign:"left",padding:"7px 10px",minWidth:130,color:"rgba(255,255,255,0.5)",cursor:"default"}}>Takım</th>
+                  {MATRIX_COLS.map((col) => (
+                    <th
+                      key={col.key}
+                      onClick={() => setMatrixSortCol((prev) => (prev === col.key ? null : col.key))}
+                      style={{
+                        ...thBase,
+                        color: col.color,
+                        background: matrixSortCol === col.key ? "rgba(16,185,129,0.18)" : "#0a0f1e",
+                        minWidth: col.isChamp ? 80 : undefined,
+                      }}
+                      title={matrixSortCol === col.key ? "Varsayılan sıralamaya dön" : `${col.label} göre sırala`}
+                    >
+                      {col.isChamp && (
+                        <svg style={{verticalAlign:"middle",marginRight:3}} width="9" height="9" viewBox="0 0 24 24" fill="#f59e0b" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                      )}
+                      {col.label}{matrixSortCol === col.key ? " ▼" : ""}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -2826,19 +2877,25 @@ export default function App() {
                           <span style={{fontWeight:700,color:"#0f172a",fontSize:12,whiteSpace:"nowrap"}}>{INITIAL_TEAMS[id]?.name}</span>
                         </div>
                       </td>
-                      <td style={tdCls("#059669",true)}>{(t.r32??0).toFixed(1)}%</td>
-                      <td style={tdCls("#374151",false)}>{(t.r16??0).toFixed(1)}%</td>
-                      <td style={tdCls("#374151",false)}>{(t.qf??0).toFixed(1)}%</td>
-                      <td style={tdCls("#0284c7",true)}>{(t.sf??0).toFixed(1)}%</td>
-                      <td style={tdCls("#7c3aed",true)}>{(t.f??0).toFixed(1)}%</td>
-                      <td style={{padding:"6px 8px",background:"rgba(217,119,6,0.02)"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:5}}>
-                          <div style={{width:36,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
-                            <div style={{width:`${Math.min(100,(champPct/maxChamp)*100)}%`,height:"100%",background:isTop3?"linear-gradient(90deg,#d97706,#f59e0b)":"linear-gradient(90deg,#94a3b8,#cbd5e1)",borderRadius:2}}></div>
-                          </div>
-                          <span style={{fontFamily:"monospace",fontWeight:900,color:isTop3?"#b45309":"#374151",fontSize:12,minWidth:38,textAlign:"right"}}>{champPct.toFixed(1)}%</span>
-                        </div>
-                      </td>
+                      {MATRIX_COLS.map((col) => {
+                        const val = t[col.key] ?? 0;
+                        const cellStyle = probCellStyle(val);
+                        if (col.isChamp) {
+                          return (
+                            <td key={col.key} style={{padding:"6px 8px", ...cellStyle}}>
+                              <div style={{display:"flex",alignItems:"center",gap:5,justifyContent:"flex-end"}}>
+                                <div style={{width:36,height:4,background:"#f1f5f9",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+                                  <div style={{width:`${Math.min(100,(champPct/maxChamp)*100)}%`,height:"100%",background:isTop3?"linear-gradient(90deg,#d97706,#f59e0b)":"linear-gradient(90deg,#94a3b8,#cbd5e1)",borderRadius:2}}></div>
+                                </div>
+                                <span style={{fontFamily:"monospace",fontWeight:900,fontSize:12,minWidth:38,textAlign:"right",color:cellStyle.color}}>{val.toFixed(1)}%</span>
+                              </div>
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={col.key} style={{...tdBase, ...cellStyle}}>{val.toFixed(1)}%</td>
+                        );
+                      })}
                     </tr>
                   );
                 })}
@@ -2848,22 +2905,23 @@ export default function App() {
 
           return (
             <div style={{display:"flex",flexDirection:"column",gap:0,borderRadius:16,overflow:"hidden",boxShadow:"0 6px 24px rgba(0,0,0,0.06)",border:"1px solid #e2e8f0"}}>
-              {/* Header */}
-              <div style={{background:"#0a0f1e",padding:"12px 18px",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{background:"#0a0f1e",padding:"12px 18px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
                 <div style={{width:3,height:24,background:"linear-gradient(180deg,#10b981,#059669)",borderRadius:2}}></div>
                 <div>
                   <div style={{fontSize:12.5,fontWeight:900,color:"#ffffff",letterSpacing:"0.06em",fontFamily:"'Inter',system-ui"}}>OLASILIK MATRİSİ</div>
-                  <div style={{fontSize:9,color:"#475569",fontFamily:"monospace",fontWeight:600,marginTop:1,letterSpacing:"0.08em"}}>10,000× MONTE CARLO SİMÜLASYONU</div>
+                  <div style={{fontSize:9,color:"#475569",fontFamily:"monospace",fontWeight:600,marginTop:1,letterSpacing:"0.08em"}}>10,000× MONTE CARLO · Sütun başlığına tıkla = o tura göre sırala</div>
                 </div>
-                <div style={{marginLeft:"auto",display:"flex",gap:16,alignItems:"center"}}>
-                  {[["S32","Son 32"],["S16","Son 16"],["ÇF","Çeyrek"],["YF","Yarı F."],["F","Final"]].map(([k,v])=>(
-                    <div key={k} style={{fontSize:9,color:"rgba(255,255,255,0.4)",fontFamily:"monospace"}}>
-                      <span style={{color:"rgba(255,255,255,0.7)",fontWeight:700}}>{k}</span> = {v}
-                    </div>
-                  ))}
+                <div style={{marginLeft:"auto",display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:5,fontSize:9,color:"rgba(255,255,255,0.5)",fontFamily:"monospace"}}>
+                    <span style={{width:28,height:10,borderRadius:3,background:"linear-gradient(90deg,transparent,rgba(239,68,68,0.45))",display:"inline-block"}}></span>
+                    &lt;50% kırmızı
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5,fontSize:9,color:"rgba(255,255,255,0.5)",fontFamily:"monospace"}}>
+                    <span style={{width:28,height:10,borderRadius:3,background:"linear-gradient(90deg,transparent,rgba(16,185,129,0.45))",display:"inline-block"}}></span>
+                    &gt;50% yeşil
+                  </div>
                 </div>
               </div>
-              {/* Dual column tables */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1px 1fr",background:"#ffffff"}}>
                 <div style={{overflowX:"auto"}}><MatrixTable ids={leftIds} offset={0} /></div>
                 <div style={{background:"#e2e8f0"}}></div>
