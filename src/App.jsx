@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { getFifaTargetThird } from "./fifaMatrix";
-import { buildScoresMap, compareBestThirdPlace, rankGroupByFifaRules } from "./fifaStandings";
+import { buildScoresMap, compareBestThirdPlace, rankGroupByFifaRules, computeGroupPositionProbabilities } from "./fifaStandings";
 import { buildTemplateOfficialBracket } from "./officialBracketTemplate";
 import { usePersistentState } from "./usePersistentState";
 
@@ -2213,6 +2213,20 @@ export default function App() {
           const qualThirdIds = new Set((officialOnlyTableData.thirds||[]).slice(0,8).map(t=>t.id));
           const simRows = liveTableData.groups[gName] || [];
 
+          const groupScoresMap = buildScoresMap(gFixtures, (f) => {
+            const off = officialScores[f.id];
+            if (off && off.home !== "" && off.away !== "") return off;
+            const usr = userScores[f.id];
+            if (usr && usr.home !== "" && usr.away !== "") return usr;
+            if (singleDisplayScores[f.id]) return singleDisplayScores[f.id];
+            return null;
+          });
+          const remainingCount = gFixtures.filter((f) => !groupScoresMap[f.id]).length;
+          const scenarioPosProbs =
+            remainingCount <= 7
+              ? computeGroupPositionProbabilities(gTeams, gFixtures, groupScoresMap, activeTeams)
+              : null;
+
           const cardStyle = {background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:14,padding:"14px 16px",boxShadow:"0 2px 8px rgba(0,0,0,0.03)"};
           const sectionTitle = (label, color="#047857") => (
             <div style={{fontSize:11,fontWeight:900,color,letterSpacing:"0.07em",textTransform:"uppercase",borderBottom:"2px solid #f0fdf4",paddingBottom:6,marginBottom:10,display:"flex",alignItems:"center",gap:7}}>
@@ -2348,7 +2362,7 @@ export default function App() {
                 {/* 3. Simüle Puan Durumu */}
                 <div style={cardStyle}>
                   {sectionTitle(`GRUP ${gName} — SİMÜLE PUAN DURUMU`,"#7c3aed")}
-                  <div style={{marginBottom:8,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>Resmi + Tahmin + Monte Carlo simülasyon skorlarıyla oluşturulan beklenen tablo (FIFA averaj kuralları)</div>
+                  <div style={{marginBottom:8,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>Resmi + Tahmin + Simülasyon skorları · Sıralama: önce ikili/üçlü averaj (H2H puan/AV/AG), sonra genel AV/AG</div>
                   <div style={{display:"flex",flexDirection:"column",gap:3}}>
                     {simRows.map((row,idx)=>{
                       const id = row.id;
@@ -2373,7 +2387,11 @@ export default function App() {
                 {/* 4. Bitiş Pozisyonu Olasılıkları */}
                 <div style={cardStyle}>
                   {sectionTitle(`GRUP ${gName} — POZİSYON OLASILIKLARI`,"#b45309")}
-                  <div style={{marginBottom:10,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>10.000× Monte Carlo simülasyonuna göre her takımın grubu kaçıncı sırada bitirme ihtimali</div>
+                  <div style={{marginBottom:10,fontSize:10,color:"#94a3b8",fontFamily:"monospace"}}>
+                    {scenarioPosProbs
+                      ? `Kalan ${remainingCount} maç senaryosu × FIFA ikili/üçlü averaj + genel averaj`
+                      : "10.000× Monte Carlo simülasyonu (FIFA ikili/üçlü averaj + genel averaj)"}
+                  </div>
                   <table style={{width:"100%",borderCollapse:"collapse"}}>
                     <thead>
                       <tr>
@@ -2386,7 +2404,10 @@ export default function App() {
                     <tbody>
                       {gTeams.map((id,ti)=>{
                         const t = simResults.teams[id]||{};
-                        const vals=[t.g1??0,t.g2??0,t.g3??0,t.g4??0];
+                        const sp = scenarioPosProbs?.[id];
+                        const vals=sp
+                          ? [sp.g1, sp.g2, sp.g3, sp.g4]
+                          : [t.g1??0,t.g2??0,t.g3??0,t.g4??0];
                         const maxVal=Math.max(...vals);
                         return (
                           <tr key={id} style={{borderBottom:"1px solid #f8fafc",background:ti%2===0?"#ffffff":"#fafbfc"}}>

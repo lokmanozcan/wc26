@@ -1,6 +1,7 @@
 // FIFA 2026 grup aşaması sıralama kuralları:
-// 1) Puan → 2) İkili/üçlü mini-lig (H2H puan, H2H averaj, H2H atılan gol)
-//    → 3) Genel averaj → 4) Genel atılan gol → 5) ELO (FIFA sıralaması yerine)
+// ADIM 1 — Eşit puandaki takımlar arası mini-lig: H2H puan → H2H averaj → H2H atılan gol
+//         (hâlâ eşitse yalnızca bu takımlar arasında Adım 1 tekrarlanır)
+// ADIM 2 — Genel averaj → Genel atılan gol → ELO (FIFA sıralaması yerine)
 // En iyi 3.ler için yalnızca genel kriterler (H2H yok).
 
 function emptyStats() {
@@ -46,41 +47,77 @@ function compareMiniStats(mA, mB) {
   return mB.pts - mA.pts || mB.gd - mA.gd || mB.gf - mA.gf;
 }
 
-function compareOverallStats(oA, oB) {
-  return oB.gd - oA.gd || oB.gf - oA.gf || oA.ga - oB.ga;
+function isMiniTied(a, b, miniStats) {
+  return compareMiniStats(miniStats[a], miniStats[b]) === 0;
 }
 
-function compareTeamsFifa(a, b, miniStats, overallStats, eloMap) {
-  let c = compareMiniStats(miniStats[a], miniStats[b]);
-  if (c !== 0) return c;
-  c = compareOverallStats(overallStats[a], overallStats[b]);
+function compareOverallStats(oA, oB) {
+  return oB.gd - oA.gd || oB.gf - oA.gf;
+}
+
+function compareOverallWithElo(a, b, overallStats, eloMap) {
+  let c = compareOverallStats(overallStats[a], overallStats[b]);
   if (c !== 0) return c;
   c = getElo(eloMap, b) - getElo(eloMap, a);
   if (c !== 0) return c;
   return a.localeCompare(b);
 }
 
-function rankFifaSubset(subset, teamIds, fixtures, scoresByFixtureId, overallStats, eloMap) {
+/** Adım 2: mini-lig eşitliği çözülemediyse genel averaj + ELO */
+function rankByOverallSubset(subset, overallStats, eloMap) {
   if (subset.length <= 1) return [...subset];
 
-  const miniStats = computeGroupStats(teamIds, fixtures, scoresByFixtureId, subset);
-  const sorted = [...subset].sort((a, b) => compareTeamsFifa(a, b, miniStats, overallStats, eloMap));
-
+  const sorted = [...subset].sort((a, b) => compareOverallWithElo(a, b, overallStats, eloMap));
   const result = [];
   let i = 0;
   while (i < sorted.length) {
     let j = i + 1;
     while (
       j < sorted.length &&
-      compareTeamsFifa(sorted[i], sorted[j], miniStats, overallStats, eloMap) === 0
+      compareOverallStats(overallStats[sorted[i]], overallStats[sorted[j]]) === 0 &&
+      getElo(eloMap, sorted[i]) === getElo(eloMap, sorted[j])
     ) {
       j++;
     }
     const group = sorted.slice(i, j);
-    if (group.length > 1) {
-      result.push(...rankFifaSubset(group, teamIds, fixtures, scoresByFixtureId, overallStats, eloMap));
+    result.push(...group.sort((a, b) => a.localeCompare(b)));
+    i = j;
+  }
+  return result;
+}
+
+/**
+ * Eşit puandaki takım kümesini sırala.
+ * Önce yalnızca ikili/üçlü/dörtlü averaj; çözülmezse genel averaj.
+ */
+function rankFifaSubset(subset, teamIds, fixtures, scoresByFixtureId, overallStats, eloMap) {
+  if (subset.length <= 1) return [...subset];
+
+  const miniStats = computeGroupStats(teamIds, fixtures, scoresByFixtureId, subset);
+  const sorted = [...subset].sort((a, b) => {
+    const c = compareMiniStats(miniStats[a], miniStats[b]);
+    return c !== 0 ? c : a.localeCompare(b);
+  });
+
+  const result = [];
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i + 1;
+    while (j < sorted.length && isMiniTied(sorted[i], sorted[j], miniStats)) {
+      j++;
+    }
+    const tiedGroup = sorted.slice(i, j);
+
+    if (tiedGroup.length === 1) {
+      result.push(tiedGroup[0]);
+    } else if (tiedGroup.length === subset.length) {
+      // Tüm eşit puanlı takımlar mini-ligde hâlâ berabere → Adım 2
+      result.push(...rankByOverallSubset(tiedGroup, overallStats, eloMap));
     } else {
-      result.push(group[0]);
+      // Alt küme hâlâ mini-ligde eşit → Adım 1'i yalnızca bu takımlar için tekrarla
+      result.push(
+        ...rankFifaSubset(tiedGroup, teamIds, fixtures, scoresByFixtureId, overallStats, eloMap)
+      );
     }
     i = j;
   }
@@ -106,6 +143,38 @@ export function rankGroupByFifaRules(teamIds, fixtures, scoresByFixtureId, eloMa
     });
 
   return order.map((id) => ({ id, ...overallStats[id] }));
+}
+
+/**
+ * Grup içi bitiş pozisyonu olasılıkları (%).
+ * Kalan maç senaryolarında FIFA Adım 1 + Adım 2 sıralaması uygulanır.
+ */
+export function computeGroupPositionProbabilities(gTeams, gFixtures, scoresByFixtureId, eloMap) {
+  const scenarios = enumerateGroupScoreScenarios(gFixtures, scoresByFixtureId);
+  const counts = Object.fromEntries(
+    gTeams.map((id) => [id, { 1: 0, 2: 0, 3: 0, 4: 0 }])
+  );
+
+  scenarios.forEach((scenario) => {
+    rankGroupByFifaRules(gTeams, gFixtures, scenario, eloMap).forEach((row, idx) => {
+      const pos = idx + 1;
+      if (counts[row.id] && counts[row.id][pos] !== undefined) {
+        counts[row.id][pos]++;
+      }
+    });
+  });
+
+  const total = scenarios.length || 1;
+  const probs = {};
+  gTeams.forEach((id) => {
+    probs[id] = {
+      g1: (counts[id][1] / total) * 100,
+      g2: (counts[id][2] / total) * 100,
+      g3: (counts[id][3] / total) * 100,
+      g4: (counts[id][4] / total) * 100,
+    };
+  });
+  return probs;
 }
 
 /** En iyi 3.ler — genel puan / averaj / gol (gruplar arası H2H yok) */
