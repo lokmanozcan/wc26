@@ -103,7 +103,7 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
 
   const W = 800;
   const H = 280;
-  const pad = { top: 28, right: 72, bottom: 32, left: 44 };
+  const pad = { top: 28, right: 88, bottom: 32, left: 44 };
   const innerW = W - pad.left - pad.right;
   const innerH = H - pad.top - pad.bottom;
   const baseY = pad.top + innerH;
@@ -158,7 +158,7 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
       })
       .sort((a, b) => a.last.y - b.last.y);
 
-    const minGap = 13;
+    const minGap = 20;
     for (let i = 1; i < items.length; i++) {
       if (items[i].labelY - items[i - 1].labelY < minGap) {
         items[i].labelY = items[i - 1].labelY + minGap;
@@ -293,21 +293,22 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
                   );
                 })}
 
-                {/* Çizgi sonu takım etiketleri — grafik üzerinde */}
+                {/* Çizgi sonu takım etiketleri — isim + % aynı satırda */}
                 {endLabels.map((item) => {
                   const ly = item.labelY ?? item.last.y;
                   const lx = Math.min(item.last.x + 6, W - pad.right - 4);
-                  const name = item.label.length > 14 ? item.label.slice(0, 12) + "…" : item.label;
-                  const tw = Math.max(44, name.length * 5.8 + 8);
+                  const name = item.teamName.length > 12 ? item.teamName.slice(0, 10) + "…" : item.teamName;
+                  const pct = `${item.last.value.toFixed(1)}%`;
+                  const labelH = 18;
+                  const tw = Math.max(78, (name.length + pct.length) * 5.4 + 14);
+                  const boxY = ly - labelH / 2 - 2;
                   return (
                     <g key={`end-${item.id}`}>
-                      <line x1={item.last.x} y1={item.last.y} x2={lx} y2={ly - 4} stroke={item.color} strokeWidth={1} opacity={0.4} />
-                      <rect x={lx} y={ly - 16} width={tw} height={16} rx={4} fill={item.color} />
-                      <text x={lx + tw / 2} y={ly - 5} textAnchor="middle" fontSize={9} fill="#fff" fontWeight="bold">
-                        {name}
-                      </text>
-                      <text x={lx + tw / 2} y={ly + 10} textAnchor="middle" fontSize={9} fill={item.color} fontWeight="bold" fontFamily="monospace">
-                        {item.last.value.toFixed(1)}%
+                      <line x1={item.last.x} y1={item.last.y} x2={lx} y2={ly} stroke={item.color} strokeWidth={1.2} opacity={0.45} />
+                      <rect x={lx} y={boxY} width={tw} height={labelH} rx={5} fill={item.color} />
+                      <text x={lx + 7} y={boxY + 12.5} fontSize={9.5} fill="#fff" fontWeight="bold">
+                        <tspan>{name}</tspan>
+                        <tspan dx={5} fontFamily="monospace" fontWeight="900" fontSize={10}>{pct}</tspan>
                       </text>
                     </g>
                   );
