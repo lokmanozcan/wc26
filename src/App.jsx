@@ -785,6 +785,8 @@ export default function App() {
   const bracketPanelRef = useRef(null);
   const liveGroupsPanelRef = useRef(null);
   const liveBracketPanelRef = useRef(null);
+  const scoreSimTimerRef = useRef(null);
+  const refreshSimRef = useRef(() => {});
 
   // ── PURE CANVAS RENDERER — html2canvas bağımlılığı yok ───────────────────
   // Bayrak görsellerini önbelleğe alır
@@ -1499,6 +1501,8 @@ export default function App() {
 
   const handleScoreChange = (fixtureId, side, value) => {
     setUserScores(prev => ({ ...prev, [fixtureId]: { ...prev[fixtureId], [side]: value } }));
+    clearTimeout(scoreSimTimerRef.current);
+    scoreSimTimerRef.current = setTimeout(() => refreshSimRef.current(), 1200);
   };
 
   const getKOWinner = (idA, idB) => {
@@ -1726,6 +1730,8 @@ export default function App() {
     }, 30);
   }, [simRunning, activeTeams, officialScores, customElo, officialKOScores, knockoutScores, setSimCache, setProbHistory]);
 
+  refreshSimRef.current = refreshSimulation;
+
   // Geçmiş seed verilerini bir kez yükle
   useEffect(() => {
     if (!probHistoryLoaded) return;
@@ -1734,10 +1740,7 @@ export default function App() {
 
   const trendSnapshots = probHistory?.snapshots ?? [];
 
-  const simInputKey = buildSimCacheKey(officialScores, customElo, officialKOScores, knockoutScores);
-  const prevSimKeyRef = useRef(null);
-
-  // İlk açılışta kayıtlı simülasyonu yükle — otomatik yeniden simüle etme
+  // İlk açılışta kayıtlı simülasyonu yükle — sayfa yenilemede yeniden simüle etme
   useEffect(() => {
     if (!dbLoaded || !simCacheLoaded || simResults) return;
 
@@ -1749,25 +1752,16 @@ export default function App() {
       } catch (_) { /* ignore */ }
     }
 
-    if (cached?.results && cached.key === simInputKey) {
+    if (cached?.results) {
       setSimResults(cached.results);
       if (cached.results.displayScores) {
         setSingleDisplayScores(cached.results.displayScores);
       }
       if (!simCache?.results) setSimCache(cached);
-    } else if (cached?.results && cached.key !== simInputKey) {
-      refreshSimulation();
     }
-  }, [dbLoaded, simCacheLoaded, simCache, simResults, setSimCache, simInputKey, refreshSimulation]);
+  }, [dbLoaded, simCacheLoaded, simCache, simResults, setSimCache]);
 
-  // Resmi eleme skoru veya grup skoru değişince simülasyonu güncelle
-  useEffect(() => {
-    if (!dbLoaded || !simCacheLoaded) return;
-    const prev = prevSimKeyRef.current;
-    prevSimKeyRef.current = simInputKey;
-    if (prev === null || prev === simInputKey || !simResults) return;
-    refreshSimulation();
-  }, [simInputKey, dbLoaded, simCacheLoaded, simResults, refreshSimulation]);
+  useEffect(() => () => clearTimeout(scoreSimTimerRef.current), []);
 
   const buildLiveBracket = () => {
     if (!simResults || !liveTableData.groups || Object.keys(liveTableData.groups).length === 0) return null;
@@ -2799,6 +2793,8 @@ export default function App() {
                                 title="Resmi sonuç olarak kaydet"
                                 onClick={() => {
                                   setOfficialScores(prev => ({...prev, [f.id]: {home: userSc.home, away: userSc.away}}));
+                                  clearTimeout(scoreSimTimerRef.current);
+                                  scoreSimTimerRef.current = setTimeout(() => refreshSimRef.current(), 400);
                                 }}
                                 style={{background:"linear-gradient(135deg,#10b981,#059669)",border:"none",color:"#fff",cursor:"pointer",fontSize:10,padding:"2px 6px",flexShrink:0,fontWeight:900,borderRadius:5,letterSpacing:"0.05em",boxShadow:"0 1px 4px rgba(16,185,129,0.3)"}}>R</button>
                             )}
@@ -2806,6 +2802,8 @@ export default function App() {
                             {hasOfficialScore && (
                               <button onClick={() => {
                                   setOfficialScores(prev => {const n={...prev};delete n[f.id];return n;});
+                                  clearTimeout(scoreSimTimerRef.current);
+                                  scoreSimTimerRef.current = setTimeout(() => refreshSimRef.current(), 400);
                                 }}
                                 style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:11,padding:"0 0 0 4px",flexShrink:0,fontWeight:700}}>✕</button>
                             )}
@@ -2844,12 +2842,22 @@ export default function App() {
                         return (
                           <KOMatchRow key={`${m.idA}_${m.idB}_${i}`} m={m} score={knockoutScores[key]}
                             officialScore={officialKOScores[key]}
-                            onChange={(k,side,val)=>setKnockoutScores(prev=>({...prev,[k]:{...prev[k],[side]:val}}))}
+                            onChange={(k,side,val)=>{
+                              setKnockoutScores(prev=>({...prev,[k]:{...prev[k],[side]:val}}));
+                              clearTimeout(scoreSimTimerRef.current);
+                              scoreSimTimerRef.current = setTimeout(() => refreshSimRef.current(), 1200);
+                            }}
                             onConfirmOfficial={(k, sc) => {
                               setOfficialKOScores(prev=>({...prev,[k]:sc}));
                               setKnockoutScores(prev=>({...prev,[k]:sc}));
+                              clearTimeout(scoreSimTimerRef.current);
+                              scoreSimTimerRef.current = setTimeout(() => refreshSimRef.current(), 400);
                             }}
-                            onClearOfficial={(k) => setOfficialKOScores(prev=>{const n={...prev};delete n[k];return n;})}
+                            onClearOfficial={(k) => {
+                              setOfficialKOScores(prev=>{const n={...prev};delete n[k];return n;});
+                              clearTimeout(scoreSimTimerRef.current);
+                              scoreSimTimerRef.current = setTimeout(() => refreshSimRef.current(), 400);
+                            }}
                           />
                         );
                       })}
