@@ -2,17 +2,17 @@ import React, { useMemo, useState, useCallback } from "react";
 import { PROB_METRICS, getTeamTrendSeries } from "./probabilityHistory";
 
 const METRIC_COLORS = {
-  r32: "#34d399",
-  r16: "#38bdf8",
-  qf: "#fbbf24",
-  sf: "#fb7185",
-  f: "#c4b5fd",
-  champion: "#f59e0b",
+  r32: "#059669",
+  r16: "#0284c7",
+  qf: "#d97706",
+  sf: "#dc2626",
+  f: "#7c3aed",
+  champion: "#b45309",
 };
 
 const TEAM_PALETTE = [
-  "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#a78bfa",
-  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#84cc16",
+  "#b45309", "#059669", "#2563eb", "#dc2626", "#7c3aed",
+  "#db2777", "#0d9488", "#ea580c", "#4f46e5", "#65a30d",
 ];
 
 function toggleInSet(set, value) {
@@ -25,14 +25,13 @@ function toggleInSet(set, value) {
   return next;
 }
 
-/** Catmull-Rom → cubic Bézier — pürüzsüz eğri */
-function smoothPath(points, tension = 0.28) {
+function smoothPath(points, tension = 0.3) {
   if (!points.length) return "";
   if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
   if (points.length === 2) {
     return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
   }
-  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[Math.max(0, i - 1)];
     const p1 = points[i];
@@ -42,16 +41,29 @@ function smoothPath(points, tension = 0.28) {
     const cp1y = p1.y + (p2.y - p0.y) * tension;
     const cp2x = p2.x - (p3.x - p1.x) * tension;
     const cp2y = p2.y - (p3.y - p1.y) * tension;
-    d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
   }
   return d;
 }
 
-function areaPath(linePath, points, baseY) {
-  if (!linePath || points.length < 2) return "";
-  const last = points[points.length - 1];
-  const first = points[0];
-  return `${linePath} L ${last.x.toFixed(2)} ${baseY} L ${first.x.toFixed(2)} ${baseY} Z`;
+function computeYDomain(allValues) {
+  if (!allValues.length) return { min: 0, max: 100, ticks: [0, 25, 50, 75, 100] };
+  let min = Math.min(...allValues);
+  let max = Math.max(...allValues);
+  const span = max - min;
+  const pad = span < 3 ? 2 : Math.max(1.5, span * 0.1);
+  min = Math.max(0, Math.floor((min - pad) * 2) / 2);
+  max = Math.min(100, Math.ceil((max + pad) * 2) / 2);
+  if (max - min < 4) {
+    const mid = (min + max) / 2;
+    min = Math.max(0, Math.round((mid - 2) * 2) / 2);
+    max = Math.min(100, Math.round((mid + 2) * 2) / 2);
+  }
+  const step = max - min <= 10 ? 2 : max - min <= 25 ? 5 : 10;
+  const ticks = [];
+  for (let t = min; t <= max + 0.01; t += step) ticks.push(Math.round(t * 10) / 10);
+  if (!ticks.includes(max)) ticks.push(max);
+  return { min, max, ticks };
 }
 
 export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
@@ -83,6 +95,7 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
           id: `${teamId}_${metricKey}`,
           teamId,
           metricKey,
+          metricLabel,
           label: `${teams[teamId]?.name} · ${metricLabel}`,
           color,
           points: raw,
@@ -93,18 +106,12 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
     return list;
   }, [selectedTeams, selectedMetrics, sortedSnaps, teams]);
 
-  const W = 1100;
-  const H = 480;
-  const pad = { top: 36, right: 28, bottom: 64, left: 56 };
+  const W = 800;
+  const H = 260;
+  const pad = { top: 16, right: 16, bottom: 36, left: 44 };
   const innerW = W - pad.left - pad.right;
   const innerH = H - pad.top - pad.bottom;
   const baseY = pad.top + innerH;
-  const yTicks = [0, 20, 40, 60, 80, 100];
-
-  const valueToY = useCallback(
-    (v) => pad.top + innerH - (Math.max(0, Math.min(100, v)) / 100) * innerH,
-    [pad.top, innerH]
-  );
 
   const snapToX = useCallback(
     (i, total) => {
@@ -114,251 +121,220 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
     [pad.left, innerW]
   );
 
-  const chartSeries = useMemo(() => {
+  const rawMapped = useMemo(() => {
     const n = sortedSnaps.length;
-    return activeSeries.map((s) => {
-      const mapped = sortedSnaps.map((snap, i) => {
+    return activeSeries.map((s) => ({
+      ...s,
+      mapped: sortedSnaps.map((snap, i) => {
         const pt = s.points.find((p) => p.id === snap.id);
         const value = pt?.value ?? null;
-        return {
-          snapId: snap.id,
-          label: snap.label,
-          value,
-          x: snapToX(i, n),
-          y: value !== null ? valueToY(value) : null,
-        };
-      }).filter((p) => p.value !== null);
-      const linePath = smoothPath(mapped);
-      return { ...s, mapped, linePath, areaD: areaPath(linePath, mapped, baseY) };
-    });
-  }, [activeSeries, sortedSnaps, snapToX, valueToY, baseY]);
+        return { snapId: snap.id, label: snap.label, value, snapIdx: i, x: snapToX(i, n) };
+      }).filter((p) => p.value !== null),
+    }));
+  }, [activeSeries, sortedSnaps, snapToX]);
 
-  const hoverX = hoverIdx !== null && sortedSnaps.length > 1
-    ? snapToX(hoverIdx, sortedSnaps.length)
-  : hoverIdx === 0 && sortedSnaps.length === 1
-    ? snapToX(0, 1)
-    : null;
+  const yDomain = useMemo(() => {
+    const vals = rawMapped.flatMap((s) => s.mapped.map((p) => p.value));
+    return computeYDomain(vals);
+  }, [rawMapped]);
+
+  const valueToY = useCallback(
+    (v) => {
+      const { min, max } = yDomain;
+      const range = max - min || 1;
+      return pad.top + innerH - ((v - min) / range) * innerH;
+    },
+    [yDomain, pad.top, innerH]
+  );
+
+  const chartSeries = useMemo(() => {
+    return rawMapped.map((s) => {
+      const mapped = s.mapped.map((p) => ({ ...p, y: valueToY(p.value) }));
+      const linePath = smoothPath(mapped);
+      return { ...s, mapped, linePath };
+    });
+  }, [rawMapped, valueToY]);
+
+  const hasData = chartSeries.some((s) => s.mapped.length > 0);
+  const hoverSnap = hoverIdx !== null ? sortedSnaps[hoverIdx] : null;
+  const hoverX = hoverIdx !== null ? snapToX(hoverIdx, sortedSnaps.length) : null;
 
   const chipBtn = (active, color, children, onClick) => (
     <button
       onClick={onClick}
       style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "5px 11px",
-        borderRadius: 8,
-        border: active ? `1.5px solid ${color}` : "1.5px solid transparent",
-        cursor: "pointer",
-        fontSize: 10.5,
-        fontWeight: 700,
-        background: active ? `${color}22` : "rgba(255,255,255,0.06)",
-        color: active ? color : "rgba(255,255,255,0.55)",
-        boxShadow: active ? `0 0 12px ${color}33` : "none",
-        transition: "all 0.15s ease",
+        display: "inline-flex", alignItems: "center", gap: 5,
+        padding: "4px 10px", borderRadius: 7, border: "none", cursor: "pointer",
+        fontSize: 10.5, fontWeight: 700,
+        background: active ? color : "#f1f5f9",
+        color: active ? "#fff" : "#64748b",
+        transition: "all 0.12s",
       }}
     >
       {children}
     </button>
   );
 
-  const hasData = chartSeries.some((s) => s.mapped.length > 0);
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{
-        background: "linear-gradient(135deg,#0a0f1e 0%,#111827 50%,#0f172a 100%)",
-        borderRadius: 16,
-        padding: "18px 22px",
-        border: "1px solid rgba(16,185,129,0.15)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
-      }}>
-        <div style={{ fontSize: 15, fontWeight: 900, color: "#10b981", letterSpacing: "0.06em", marginBottom: 4 }}>
-          OLASILIK TRENDİ
-        </div>
-        <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.45)", fontFamily: "monospace" }}>
-          Çoklu takım & tur · {snapshots.length} kayıt · ölçek 0–100%
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ background: "linear-gradient(135deg,#0f172a,#1e293b)", borderRadius: 12, padding: "14px 18px", border: "1px solid rgba(16,185,129,0.15)" }}>
+        <div style={{ fontSize: 13, fontWeight: 900, color: "#10b981", letterSpacing: "0.05em" }}>OLASILIK TRENDİ</div>
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontFamily: "monospace", marginTop: 2 }}>
+          {snapshots.length} kayıt · otomatik ölçek
         </div>
       </div>
 
-      <div style={{
-        background: "linear-gradient(180deg,#0c1222 0%,#0a0f1e 100%)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        borderRadius: 18,
-        padding: "20px 22px 16px",
-        boxShadow: "0 12px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)",
-      }}>
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8, fontFamily: "monospace" }}>
-            TAKIMLAR (çoklu seçim)
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 110, overflowY: "auto" }}>
-            {teamIds.map((id, ti) => {
-              const active = selectedTeams.has(id);
-              const c = TEAM_PALETTE[ti % TEAM_PALETTE.length];
-              return chipBtn(active, c, (
-                <>
-                  <img src={getFlagUrl(teams[id]?.iso)} style={{ width: 15, height: 10, borderRadius: 2, objectFit: "cover" }} alt="" />
-                  {teams[id]?.name}
-                </>
-              ), () => setSelectedTeams((prev) => toggleInSet(prev, id)));
-            })}
-          </div>
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 16px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
+        <div style={{ fontSize: 9, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "monospace" }}>TAKIMLAR</div>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 72, overflowY: "auto", marginBottom: 12 }}>
+          {teamIds.map((id, ti) => chipBtn(
+            selectedTeams.has(id),
+            TEAM_PALETTE[ti % TEAM_PALETTE.length],
+            (<><img src={getFlagUrl(teams[id]?.iso)} style={{ width: 14, height: 10, borderRadius: 2, objectFit: "cover" }} alt="" />{teams[id]?.name}</>),
+            () => setSelectedTeams((p) => toggleInSet(p, id))
+          ))}
         </div>
 
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 9, fontWeight: 800, color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em", marginBottom: 8, fontFamily: "monospace" }}>
-            TUR İHTİMALLERİ (çoklu seçim)
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {PROB_METRICS.map((m) => {
-              const c = METRIC_COLORS[m.key];
-              const active = selectedMetrics.has(m.key);
-              return chipBtn(active, c, m.label, () => setSelectedMetrics((prev) => toggleInSet(prev, m.key)));
-            })}
-          </div>
+        <div style={{ fontSize: 9, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "monospace" }}>TUR</div>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>
+          {PROB_METRICS.map((m) => chipBtn(
+            selectedMetrics.has(m.key),
+            METRIC_COLORS[m.key],
+            m.label,
+            () => setSelectedMetrics((p) => toggleInSet(p, m.key))
+          ))}
         </div>
-
-        {/* Legend */}
-        {chartSeries.length > 0 && (
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            {chartSeries.map((s) => (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, color: "rgba(255,255,255,0.75)", fontWeight: 600 }}>
-                <span style={{ width: 22, height: 3, borderRadius: 2, background: s.color, boxShadow: `0 0 8px ${s.color}88` }} />
-                <img src={getFlagUrl(teams[s.teamId]?.iso)} style={{ width: 14, height: 10, borderRadius: 2 }} alt="" />
-                {s.label}
-                {s.mapped.length > 0 && (
-                  <span style={{ fontFamily: "monospace", color: s.color, fontWeight: 800 }}>
-                    {s.mapped[s.mapped.length - 1].value.toFixed(1)}%
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
 
         {!hasData ? (
-          <div style={{ padding: 80, textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 14 }}>
-            Henüz veri yok. Güncelle ile kayıt ekleyin.
-          </div>
+          <div style={{ padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Henüz veri yok.</div>
         ) : (
-          <div
-            style={{ width: "100%", position: "relative" }}
-            onMouseLeave={() => setHoverIdx(null)}
-          >
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              style={{ width: "100%", height: "auto", minHeight: 420, display: "block" }}
-              onMouseMove={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const relX = ((e.clientX - rect.left) / rect.width) * W;
-                const n = sortedSnaps.length;
-                if (n <= 1) { setHoverIdx(0); return; }
-                const ratio = (relX - pad.left) / innerW;
-                const idx = Math.round(Math.max(0, Math.min(1, ratio)) * (n - 1));
-                setHoverIdx(idx);
-              }}
+          <>
+            <div
+              style={{ position: "relative", borderRadius: 10, background: "#fafbfc", border: "1px solid #f1f5f9", overflow: "hidden" }}
+              onMouseLeave={() => setHoverIdx(null)}
             >
-              <defs>
-                {chartSeries.map((s) => (
-                  <linearGradient key={`grad-${s.id}`} id={`area-${s.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={s.color} stopOpacity="0.28" />
-                    <stop offset="100%" stopColor={s.color} stopOpacity="0" />
-                  </linearGradient>
-                ))}
-                <linearGradient id="chart-bg-glow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(16,185,129,0.04)" />
-                  <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-                </linearGradient>
-              </defs>
-
-              <rect x={pad.left} y={pad.top} width={innerW} height={innerH} fill="url(#chart-bg-glow)" rx={8} />
-
-              {yTicks.map((tick) => {
-                const y = valueToY(tick);
-                return (
-                  <g key={tick}>
-                    <line x1={pad.left} y1={y} x2={W - pad.right} y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
-                    <text x={pad.left - 10} y={y + 4} textAnchor="end" fontSize={10} fill="rgba(255,255,255,0.35)" fontFamily="'JetBrains Mono',monospace" fontWeight={600}>
-                      {tick}%
-                    </text>
-                  </g>
-                );
-              })}
-
-              {chartSeries.map((s) => s.areaD && (
-                <path key={`area-${s.id}`} d={s.areaD} fill={`url(#area-${s.id})`} />
-              ))}
-
-              {chartSeries.map((s) => s.linePath && (
-                <path
-                  key={`line-${s.id}`}
-                  d={s.linePath}
-                  fill="none"
-                  stroke={s.color}
-                  strokeWidth={2.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ filter: `drop-shadow(0 0 6px ${s.color}66)` }}
-                />
-              ))}
-
-              {hoverX !== null && (
-                <line x1={hoverX} y1={pad.top} x2={hoverX} y2={baseY} stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="4 4" />
-              )}
-
-              {sortedSnaps.map((snap, i) => (
-                <text
-                  key={snap.id}
-                  x={snapToX(i, sortedSnaps.length)}
-                  y={H - 18}
-                  textAnchor="middle"
-                  fontSize={9}
-                  fill={hoverIdx === i ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.35)"}
-                  fontFamily="monospace"
-                  fontWeight={hoverIdx === i ? 700 : 500}
-                  transform={sortedSnaps.length > 8 ? `rotate(-24, ${snapToX(i, sortedSnaps.length)}, ${H - 18})` : undefined}
-                >
-                  {snap.label.length > 16 ? snap.label.slice(0, 14) + "…" : snap.label}
-                </text>
-              ))}
-            </svg>
-
-            {hoverIdx !== null && sortedSnaps[hoverIdx] && (
-              <div style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                background: "rgba(15,23,42,0.92)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 12,
-                padding: "12px 14px",
-                minWidth: 200,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                pointerEvents: "none",
-              }}>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontFamily: "monospace", marginBottom: 8, fontWeight: 600 }}>
-                  {sortedSnaps[hoverIdx].label}
-                </div>
-                {chartSeries.map((s) => {
-                  const pt = s.mapped.find((p) => p.snapId === sortedSnaps[hoverIdx].id);
-                  if (!pt) return null;
+              <svg
+                viewBox={`0 0 ${W} ${H}`}
+                style={{ width: "100%", height: "auto", maxHeight: 280, display: "block" }}
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const relX = ((e.clientX - rect.left) / rect.width) * W;
+                  const n = sortedSnaps.length;
+                  if (n <= 1) { setHoverIdx(0); return; }
+                  const ratio = (relX - pad.left) / innerW;
+                  setHoverIdx(Math.round(Math.max(0, Math.min(1, ratio)) * (n - 1)));
+                }}
+              >
+                {yDomain.ticks.map((tick) => {
+                  const y = valueToY(tick);
                   return (
-                    <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 5 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.8)" }}>
-                        <span style={{ width: 14, height: 2, borderRadius: 1, background: s.color }} />
-                        {teams[s.teamId]?.name}
-                      </div>
-                      <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 12, color: s.color }}>
-                        {pt.value.toFixed(1)}%
-                      </span>
-                    </div>
+                    <g key={tick}>
+                      <line x1={pad.left} y1={y} x2={W - pad.right} y2={y} stroke="#e2e8f0" strokeWidth={1} />
+                      <text x={pad.left - 6} y={y + 3.5} textAnchor="end" fontSize={9} fill="#94a3b8" fontFamily="monospace">{tick}%</text>
+                    </g>
                   );
                 })}
-              </div>
-            )}
-          </div>
+
+                {chartSeries.map((s) => s.linePath && (
+                  <path key={s.id} d={s.linePath} fill="none" stroke={s.color} strokeWidth={2.2} strokeLinecap="round" opacity={hoverIdx !== null ? 0.45 : 1} />
+                ))}
+
+                {hoverIdx !== null && chartSeries.map((s) => {
+                  const pt = s.mapped.find((p) => p.snapIdx === hoverIdx);
+                  if (!pt) return null;
+                  return (
+                    <path key={`hl-${s.id}`} d={s.linePath} fill="none" stroke={s.color} strokeWidth={2.8} strokeLinecap="round" />
+                  );
+                })}
+
+                {hoverX !== null && (
+                  <line x1={hoverX} y1={pad.top} x2={hoverX} y2={baseY} stroke="#94a3b8" strokeWidth={1} strokeDasharray="3 3" opacity={0.7} />
+                )}
+
+                {hoverIdx !== null && chartSeries.map((s) => {
+                  const pt = s.mapped.find((p) => p.snapIdx === hoverIdx);
+                  if (!pt) return null;
+                  return (
+                    <circle key={`dot-${s.id}`} cx={pt.x} cy={pt.y} r={5} fill="#fff" stroke={s.color} strokeWidth={2.5} />
+                  );
+                })}
+
+                {sortedSnaps.map((snap, i) => (
+                  <text
+                    key={snap.id}
+                    x={snapToX(i, sortedSnaps.length)}
+                    y={H - 10}
+                    textAnchor="middle"
+                    fontSize={8}
+                    fill={hoverIdx === i ? "#0f172a" : "#94a3b8"}
+                    fontFamily="monospace"
+                    fontWeight={hoverIdx === i ? 700 : 500}
+                  >
+                    {snap.label.length > 12 ? snap.label.slice(0, 10) + "…" : snap.label}
+                  </text>
+                ))}
+              </svg>
+            </div>
+
+            {/* Hover detay paneli — her zaman grafik altında, sabit yer */}
+            <div style={{
+              marginTop: 10,
+              minHeight: hoverSnap ? "auto" : 36,
+              padding: hoverSnap ? "10px 12px" : "8px 12px",
+              borderRadius: 8,
+              background: hoverSnap ? "#f0fdf4" : "#f8fafc",
+              border: `1px solid ${hoverSnap ? "#bbf7d0" : "#e2e8f0"}`,
+              transition: "background 0.15s",
+            }}>
+              {!hoverSnap ? (
+                <div style={{ fontSize: 10.5, color: "#94a3b8", textAlign: "center", fontFamily: "monospace" }}>
+                  Değerleri görmek için grafiğin üzerine gelin
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#065f46", marginBottom: 8, fontFamily: "monospace" }}>
+                    {hoverSnap.label}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {chartSeries.map((s) => {
+                      const pt = s.mapped.find((p) => p.snapIdx === hoverIdx);
+                      if (!pt) return null;
+                      return (
+                        <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                            <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                            <img src={getFlagUrl(teams[s.teamId]?.iso)} style={{ width: 16, height: 11, borderRadius: 2, flexShrink: 0 }} alt="" />
+                            <span style={{ fontSize: 11.5, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {teams[s.teamId]?.name}
+                            </span>
+                            <span style={{ fontSize: 10, color: "#64748b" }}>· {s.metricLabel}</span>
+                          </div>
+                          <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 13, color: s.color, flexShrink: 0 }}>
+                            {pt.value.toFixed(1)}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Kompakt legend */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9" }}>
+              {chartSeries.map((s) => (
+                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#475569" }}>
+                  <span style={{ width: 16, height: 3, borderRadius: 2, background: s.color }} />
+                  <span style={{ fontWeight: 600 }}>{s.label}</span>
+                  {s.mapped.length > 0 && (
+                    <span style={{ fontFamily: "monospace", fontWeight: 800, color: s.color }}>
+                      {s.mapped[s.mapped.length - 1].value.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
