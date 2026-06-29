@@ -1548,15 +1548,15 @@ export default function App() {
       [[idA, idB, posA], [idB, idA, posB]].forEach(([me, opp, myPos]) => {
         if (!encounterStats[me][opp]) {
           encounterStats[me][opp] = {
-            r32:0, r16:0, qf:0, sf:0, f:0, total:0,
+            r32:0, r16:0, qf:0, sf:0, f:0, tp:0, total:0,
             pos1:0, pos2:0, pos3:0,
-            pos1_r32:0, pos1_r16:0, pos1_qf:0, pos1_sf:0, pos1_f:0,
-            pos2_r32:0, pos2_r16:0, pos2_qf:0, pos2_sf:0, pos2_f:0,
-            pos3_r32:0, pos3_r16:0, pos3_qf:0, pos3_sf:0, pos3_f:0,
+            pos1_r32:0, pos1_r16:0, pos1_qf:0, pos1_sf:0, pos1_f:0, pos1_tp:0,
+            pos2_r32:0, pos2_r16:0, pos2_qf:0, pos2_sf:0, pos2_f:0, pos2_tp:0,
+            pos3_r32:0, pos3_r16:0, pos3_qf:0, pos3_sf:0, pos3_f:0, pos3_tp:0,
           };
         }
         const e = encounterStats[me][opp];
-        e[round]++;
+        if (e[round] !== undefined) e[round]++;
         e.total++;
         if (myPos === 1) { e.pos1++; e[`pos1_${round}`]++; }
         else if (myPos === 2) { e.pos2++; e[`pos2_${round}`]++; }
@@ -1637,8 +1637,6 @@ export default function App() {
       });
 
       r32Matches.forEach(m=>{ if(m[0]&&stats[m[0]])stats[m[0]].r32++; if(m[1]&&stats[m[1]])stats[m[1]].r32++; });
-      // R32 karşılaşmalarını kaydet
-      r32Matches.forEach(([idA, idB]) => { if(idA && idB) addEncounter(idA, idB, "r32", groupPos[idA], groupPos[idB]); });
 
       const runStage = (matches, nextKey, roundKey) => {
         const wL=[]; const loL=[];
@@ -1651,7 +1649,6 @@ export default function App() {
           const winner = pickWinner(idA, idB);
           const loser = winner === idA ? idB : idA;
           wL.push(winner); loL.push(loser); matchupStats[pk][winner]++;
-          // İlk sim'de eleme kazananını kaydet
           if (sim === 0) firstSimBracketPath[`${roundKey}_${pk}`] = winner;
         });
         wL.forEach(id=>{if(id&&stats[id])stats[id][nextKey]++;});
@@ -1659,19 +1656,25 @@ export default function App() {
         return {pairs, losersList:loL};
       };
 
-      const r16R=runStage(r32Matches,"r16","r16"); const qfR=runStage(r16R.pairs,"qf","qf");
-      const sfR=runStage(qfR.pairs,"sf","sf"); runStage(sfR.pairs,"f","f");
-      const sfM=sfR.pairs;
-      if(sfM.length>=2){
-        const sf1A=sfM[0][0],sf1B=sfM[0][1],sf2A=sfM[1][0],sf2B=sfM[1][1];
-        const w1=pickWinner(sf1A, sf1B); const l1=w1===sf1A?sf1B:sf1A;
-        const w2=pickWinner(sf2A, sf2B); const l2=w2===sf2A?sf2B:sf2A;
-        addEncounter(w1, w2, "f", groupPos[w1], groupPos[w2]); // Final
-        const champ=pickWinner(w1, w2);
-        if(stats[champ])stats[champ].champion++;
-        addEncounter(l1, l2, "f", groupPos[l1], groupPos[l2]); // 3.lük
-        const tpw=pickWinner(l1, l2);
-        if(stats[tpw])stats[tpw].thirdPlaceChamp++;
+      // roundKey = oynanan tur; nextKey = kazananların ilerlediği istatistik sütunu
+      const r16R = runStage(r32Matches, "r16", "r32");
+      const qfR  = runStage(r16R.pairs, "qf", "r16");
+      const sfR  = runStage(qfR.pairs, "sf", "qf");
+      const sfResult = runStage(sfR.pairs, "f", "sf");
+
+      const finalPair = sfResult.pairs[0];
+      if (finalPair?.[0] && finalPair?.[1]) {
+        const w1 = finalPair[0], w2 = finalPair[1];
+        addEncounter(w1, w2, "f", groupPos[w1], groupPos[w2]);
+        const champ = pickWinner(w1, w2);
+        if (stats[champ]) stats[champ].champion++;
+      }
+
+      const [l1, l2] = sfResult.losersList;
+      if (l1 && l2) {
+        addEncounter(l1, l2, "tp", groupPos[l1], groupPos[l2]);
+        const tpw = pickWinner(l1, l2);
+        if (stats[tpw]) stats[tpw].thirdPlaceChamp++;
       }
     }
 
@@ -2543,7 +2546,7 @@ export default function App() {
                   if (encounterRoundFilter === "qf")  return e.qf  || 0;
                   if (encounterRoundFilter === "sf")  return e.sf  || 0;
                   if (encounterRoundFilter === "f")   return e.f   || 0;
-                  return e.total || 0; // all
+                  return e.total || 0; // all (3.lük maçı hariç)
                 };
 
                 // Tüm rakiplerin ham sayılarını topla → normalize payda
@@ -2586,12 +2589,12 @@ export default function App() {
                   const posLabel = {"1st":"1. bitirdiğinde","2nd":"2. bitirdiğinde","3rd":"3. bitirdiğinde"}[encounterPosFilter];
                   const roundLabel = roundLabels[encounterRoundFilter];
                   if (encounterPosFilter !== "all" && encounterRoundFilter !== "all")
-                    return `${INITIAL_TEAMS[encTeamId]?.name} grubu ${posLabel} ${roundLabel} turunda eşleştiği rakipler (normalize, toplam %100)`;
+                    return `${INITIAL_TEAMS[encTeamId]?.name} grubu ${posLabel} ${roundLabel} turunda eşleşebileceği rakipler — turnuva ağacı + 10.000× sim (toplam %100)`;
                   if (encounterPosFilter !== "all")
-                    return `${INITIAL_TEAMS[encTeamId]?.name} grubu ${posLabel} eşleştiği rakipler (normalize, toplam %100)`;
+                    return `${INITIAL_TEAMS[encTeamId]?.name} grubu ${posLabel} eşleşebileceği rakipler — turnuva ağacı + simülasyon (toplam %100)`;
                   if (encounterRoundFilter !== "all")
-                    return `${roundLabel} turunda eşleşilen rakipler (normalize, toplam %100)`;
-                  return "Turnuva boyunca tüm turlardaki karşılaşmalar (normalize, toplam %100)";
+                    return `${roundLabel} turunda eşleşilebilecek rakipler — turnuva ağacı + simülasyon (toplam %100)`;
+                  return "Turnuva ağacındaki olası tüm karşılaşmalar (3.lük maçı hariç, toplam %100)";
                 };
 
                 return (
