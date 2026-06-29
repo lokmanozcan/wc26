@@ -10,9 +10,18 @@ const METRIC_COLORS = {
   champion: "#b45309",
 };
 
-const TEAM_PALETTE = [
-  "#b45309", "#059669", "#2563eb", "#dc2626", "#7c3aed",
-  "#db2777", "#0d9488", "#ea580c", "#4f46e5", "#65a30d",
+/** Çoklu takımda net ayırt edilebilir renkler */
+const DISTINCT_COLORS = [
+  "#e11d48",
+  "#2563eb",
+  "#16a34a",
+  "#9333ea",
+  "#ea580c",
+  "#0891b2",
+  "#ca8a04",
+  "#be185d",
+  "#4f46e5",
+  "#0d9488",
 ];
 
 function toggleInSet(set, value) {
@@ -25,25 +34,9 @@ function toggleInSet(set, value) {
   return next;
 }
 
-function smoothPath(points, tension = 0.3) {
+function straightPath(points) {
   if (!points.length) return "";
-  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-  if (points.length === 2) {
-    return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
-  }
-  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[Math.max(0, i - 1)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(points.length - 1, i + 2)];
-    const cp1x = p1.x + (p2.x - p0.x) * tension;
-    const cp1y = p1.y + (p2.y - p0.y) * tension;
-    const cp2x = p2.x - (p3.x - p1.x) * tension;
-    const cp2y = p2.y - (p3.y - p1.y) * tension;
-    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
-  }
-  return d;
+  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
 }
 
 function computeYDomain(allValues) {
@@ -72,6 +65,8 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
   const [selectedMetrics, setSelectedMetrics] = useState(() => new Set(["champion"]));
   const [hoverIdx, setHoverIdx] = useState(null);
 
+  const selectedTeamsArr = useMemo(() => [...selectedTeams], [selectedTeams]);
+
   const sortedSnaps = useMemo(
     () => [...snapshots].sort((a, b) => a.recordedAt - b.recordedAt),
     [snapshots]
@@ -80,23 +75,23 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
   const activeSeries = useMemo(() => {
     const list = [];
     let colorIdx = 0;
+    const multiMetric = selectedMetrics.size > 1;
     [...selectedTeams].forEach((teamId) => {
       [...selectedMetrics].forEach((metricKey) => {
         const raw = getTeamTrendSeries(sortedSnaps, teamId, metricKey);
         const metricLabel = PROB_METRICS.find((m) => m.key === metricKey)?.label || metricKey;
-        const multiTeam = selectedTeams.size > 1;
-        const multiMetric = selectedMetrics.size > 1;
-        const color = multiTeam && !multiMetric
-          ? TEAM_PALETTE[colorIdx % TEAM_PALETTE.length]
-          : multiMetric && !multiTeam
-            ? METRIC_COLORS[metricKey]
-            : TEAM_PALETTE[colorIdx % TEAM_PALETTE.length];
+        const color = multiMetric
+          ? METRIC_COLORS[metricKey] || DISTINCT_COLORS[colorIdx % DISTINCT_COLORS.length]
+          : DISTINCT_COLORS[selectedTeamsArr.indexOf(teamId) % DISTINCT_COLORS.length];
         list.push({
           id: `${teamId}_${metricKey}`,
           teamId,
           metricKey,
           metricLabel,
-          label: `${teams[teamId]?.name} · ${metricLabel}`,
+          teamName: teams[teamId]?.name || teamId,
+          label: multiMetric
+            ? `${teams[teamId]?.name} · ${metricLabel}`
+            : teams[teamId]?.name || teamId,
           color,
           points: raw,
         });
@@ -104,11 +99,11 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
       });
     });
     return list;
-  }, [selectedTeams, selectedMetrics, sortedSnaps, teams]);
+  }, [selectedTeams, selectedMetrics, selectedTeamsArr, sortedSnaps, teams]);
 
   const W = 800;
-  const H = 260;
-  const pad = { top: 16, right: 16, bottom: 36, left: 44 };
+  const H = 280;
+  const pad = { top: 28, right: 72, bottom: 32, left: 44 };
   const innerW = W - pad.left - pad.right;
   const innerH = H - pad.top - pad.bottom;
   const baseY = pad.top + innerH;
@@ -150,13 +145,29 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
   const chartSeries = useMemo(() => {
     return rawMapped.map((s) => {
       const mapped = s.mapped.map((p) => ({ ...p, y: valueToY(p.value) }));
-      const linePath = smoothPath(mapped);
-      return { ...s, mapped, linePath };
+      return { ...s, mapped, linePath: straightPath(mapped) };
     });
   }, [rawMapped, valueToY]);
 
+  const endLabels = useMemo(() => {
+    const items = chartSeries
+      .filter((s) => s.mapped.length > 0)
+      .map((s) => {
+        const last = s.mapped[s.mapped.length - 1];
+        return { ...s, last, labelY: last.y };
+      })
+      .sort((a, b) => a.last.y - b.last.y);
+
+    const minGap = 13;
+    for (let i = 1; i < items.length; i++) {
+      if (items[i].labelY - items[i - 1].labelY < minGap) {
+        items[i].labelY = items[i - 1].labelY + minGap;
+      }
+    }
+    return items;
+  }, [chartSeries]);
+
   const hasData = chartSeries.some((s) => s.mapped.length > 0);
-  const hoverSnap = hoverIdx !== null ? sortedSnaps[hoverIdx] : null;
   const hoverX = hoverIdx !== null ? snapToX(hoverIdx, sortedSnaps.length) : null;
 
   const chipBtn = (active, color, children, onClick) => (
@@ -164,10 +175,11 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
       onClick={onClick}
       style={{
         display: "inline-flex", alignItems: "center", gap: 5,
-        padding: "4px 10px", borderRadius: 7, border: "none", cursor: "pointer",
-        fontSize: 10.5, fontWeight: 700,
+        padding: "4px 10px", borderRadius: 7, border: active ? `2px solid ${color}` : "2px solid transparent",
+        cursor: "pointer", fontSize: 10.5, fontWeight: 700,
         background: active ? color : "#f1f5f9",
         color: active ? "#fff" : "#64748b",
+        boxShadow: active ? `0 2px 8px ${color}55` : "none",
         transition: "all 0.12s",
       }}
     >
@@ -187,12 +199,17 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 16px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
         <div style={{ fontSize: 9, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "monospace" }}>TAKIMLAR</div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 72, overflowY: "auto", marginBottom: 12 }}>
-          {teamIds.map((id, ti) => chipBtn(
-            selectedTeams.has(id),
-            TEAM_PALETTE[ti % TEAM_PALETTE.length],
-            (<><img src={getFlagUrl(teams[id]?.iso)} style={{ width: 14, height: 10, borderRadius: 2, objectFit: "cover" }} alt="" />{teams[id]?.name}</>),
-            () => setSelectedTeams((p) => toggleInSet(p, id))
-          ))}
+          {teamIds.map((id) => {
+            const active = selectedTeams.has(id);
+            const c = DISTINCT_COLORS[selectedTeamsArr.indexOf(id) % DISTINCT_COLORS.length];
+            const chipColor = active ? c : "#94a3b8";
+            return chipBtn(
+              active,
+              chipColor,
+              (<><img src={getFlagUrl(teams[id]?.iso)} style={{ width: 14, height: 10, borderRadius: 2, objectFit: "cover" }} alt="" />{teams[id]?.name}</>),
+              () => setSelectedTeams((p) => toggleInSet(p, id))
+            );
+          })}
         </div>
 
         <div style={{ fontSize: 9, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "monospace" }}>TUR</div>
@@ -215,7 +232,7 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
             >
               <svg
                 viewBox={`0 0 ${W} ${H}`}
-                style={{ width: "100%", height: "auto", maxHeight: 280, display: "block" }}
+                style={{ width: "100%", height: "auto", maxHeight: 300, display: "block" }}
                 onMouseMove={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const relX = ((e.clientX - rect.left) / rect.width) * W;
@@ -236,26 +253,63 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
                 })}
 
                 {chartSeries.map((s) => s.linePath && (
-                  <path key={s.id} d={s.linePath} fill="none" stroke={s.color} strokeWidth={2.2} strokeLinecap="round" opacity={hoverIdx !== null ? 0.45 : 1} />
+                  <path
+                    key={s.id}
+                    d={s.linePath}
+                    fill="none"
+                    stroke={s.color}
+                    strokeWidth={hoverIdx !== null ? 2 : 2.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={hoverIdx !== null ? 0.35 : 1}
+                  />
                 ))}
 
                 {hoverIdx !== null && chartSeries.map((s) => {
                   const pt = s.mapped.find((p) => p.snapIdx === hoverIdx);
                   if (!pt) return null;
                   return (
-                    <path key={`hl-${s.id}`} d={s.linePath} fill="none" stroke={s.color} strokeWidth={2.8} strokeLinecap="round" />
+                    <path key={`hl-${s.id}`} d={s.linePath} fill="none" stroke={s.color} strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" />
                   );
                 })}
 
                 {hoverX !== null && (
-                  <line x1={hoverX} y1={pad.top} x2={hoverX} y2={baseY} stroke="#94a3b8" strokeWidth={1} strokeDasharray="3 3" opacity={0.7} />
+                  <line x1={hoverX} y1={pad.top} x2={hoverX} y2={baseY} stroke="#64748b" strokeWidth={1} strokeDasharray="4 4" opacity={0.5} />
                 )}
 
                 {hoverIdx !== null && chartSeries.map((s) => {
                   const pt = s.mapped.find((p) => p.snapIdx === hoverIdx);
                   if (!pt) return null;
+                  const textW = 52;
+                  const tx = Math.min(pt.x + 8, W - pad.right - textW);
                   return (
-                    <circle key={`dot-${s.id}`} cx={pt.x} cy={pt.y} r={5} fill="#fff" stroke={s.color} strokeWidth={2.5} />
+                    <g key={`hover-${s.id}`}>
+                      <circle cx={pt.x} cy={pt.y} r={5.5} fill="#fff" stroke={s.color} strokeWidth={3} />
+                      <rect x={tx - 2} y={pt.y - 20} width={textW} height={18} rx={4} fill={s.color} />
+                      <text x={tx + textW / 2 - 2} y={pt.y - 7} textAnchor="middle" fontSize={11} fill="#fff" fontWeight="bold" fontFamily="monospace">
+                        {pt.value.toFixed(1)}%
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* Çizgi sonu takım etiketleri — grafik üzerinde */}
+                {endLabels.map((item) => {
+                  const ly = item.labelY ?? item.last.y;
+                  const lx = Math.min(item.last.x + 6, W - pad.right - 4);
+                  const name = item.label.length > 14 ? item.label.slice(0, 12) + "…" : item.label;
+                  const tw = Math.max(44, name.length * 5.8 + 8);
+                  return (
+                    <g key={`end-${item.id}`}>
+                      <line x1={item.last.x} y1={item.last.y} x2={lx} y2={ly - 4} stroke={item.color} strokeWidth={1} opacity={0.4} />
+                      <rect x={lx} y={ly - 16} width={tw} height={16} rx={4} fill={item.color} />
+                      <text x={lx + tw / 2} y={ly - 5} textAnchor="middle" fontSize={9} fill="#fff" fontWeight="bold">
+                        {name}
+                      </text>
+                      <text x={lx + tw / 2} y={ly + 10} textAnchor="middle" fontSize={9} fill={item.color} fontWeight="bold" fontFamily="monospace">
+                        {item.last.value.toFixed(1)}%
+                      </text>
+                    </g>
                   );
                 })}
 
@@ -263,76 +317,61 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
                   <text
                     key={snap.id}
                     x={snapToX(i, sortedSnaps.length)}
-                    y={H - 10}
+                    y={H - 8}
                     textAnchor="middle"
-                    fontSize={8}
-                    fill={hoverIdx === i ? "#0f172a" : "#94a3b8"}
+                    fontSize={7.5}
+                    fill={hoverIdx === i ? "#64748b" : "#cbd5e1"}
                     fontFamily="monospace"
-                    fontWeight={hoverIdx === i ? 700 : 500}
                   >
-                    {snap.label.length > 12 ? snap.label.slice(0, 10) + "…" : snap.label}
+                    {snap.label.length > 11 ? snap.label.slice(0, 9) + "…" : snap.label}
                   </text>
                 ))}
               </svg>
             </div>
 
-            {/* Hover detay paneli — her zaman grafik altında, sabit yer */}
+            {/* Hover: büyük olasılık kartları */}
             <div style={{
               marginTop: 10,
-              minHeight: hoverSnap ? "auto" : 36,
-              padding: hoverSnap ? "10px 12px" : "8px 12px",
+              minHeight: 40,
+              padding: "10px 12px",
               borderRadius: 8,
-              background: hoverSnap ? "#f0fdf4" : "#f8fafc",
-              border: `1px solid ${hoverSnap ? "#bbf7d0" : "#e2e8f0"}`,
-              transition: "background 0.15s",
+              background: hoverIdx !== null ? "#fff" : "#f8fafc",
+              border: `1px solid ${hoverIdx !== null ? "#e2e8f0" : "#e2e8f0"}`,
             }}>
-              {!hoverSnap ? (
+              {hoverIdx === null ? (
                 <div style={{ fontSize: 10.5, color: "#94a3b8", textAlign: "center", fontFamily: "monospace" }}>
-                  Değerleri görmek için grafiğin üzerine gelin
+                  Olasılıkları görmek için grafiğin üzerine gelin
                 </div>
               ) : (
-                <>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#065f46", marginBottom: 8, fontFamily: "monospace" }}>
-                    {hoverSnap.label}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {chartSeries.map((s) => {
-                      const pt = s.mapped.find((p) => p.snapIdx === hoverIdx);
-                      if (!pt) return null;
-                      return (
-                        <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                            <span style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                            <img src={getFlagUrl(teams[s.teamId]?.iso)} style={{ width: 16, height: 11, borderRadius: 2, flexShrink: 0 }} alt="" />
-                            <span style={{ fontSize: 11.5, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {teams[s.teamId]?.name}
-                            </span>
-                            <span style={{ fontSize: 10, color: "#64748b" }}>· {s.metricLabel}</span>
-                          </div>
-                          <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 13, color: s.color, flexShrink: 0 }}>
-                            {pt.value.toFixed(1)}%
-                          </span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                  {chartSeries.map((s) => {
+                    const pt = s.mapped.find((p) => p.snapIdx === hoverIdx);
+                    if (!pt) return null;
+                    return (
+                      <div
+                        key={s.id}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8,
+                          padding: "8px 14px", borderRadius: 8,
+                          background: `${s.color}14`,
+                          border: `2px solid ${s.color}`,
+                        }}
+                      >
+                        <img src={getFlagUrl(teams[s.teamId]?.iso)} style={{ width: 20, height: 13, borderRadius: 2 }} alt="" />
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>{s.teamName}</div>
+                          {selectedMetrics.size > 1 && (
+                            <div style={{ fontSize: 9, color: "#64748b" }}>{s.metricLabel}</div>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Kompakt legend */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1f5f9" }}>
-              {chartSeries.map((s) => (
-                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#475569" }}>
-                  <span style={{ width: 16, height: 3, borderRadius: 2, background: s.color }} />
-                  <span style={{ fontWeight: 600 }}>{s.label}</span>
-                  {s.mapped.length > 0 && (
-                    <span style={{ fontFamily: "monospace", fontWeight: 800, color: s.color }}>
-                      {s.mapped[s.mapped.length - 1].value.toFixed(1)}%
-                    </span>
-                  )}
+                        <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 18, color: s.color }}>
+                          {pt.value.toFixed(1)}%
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
             </div>
           </>
         )}
