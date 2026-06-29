@@ -210,6 +210,25 @@ function simulateEloWeightedScore(eloHome, eloAway) {
   return { home: validCombinations[validCombinations.length - 1].home, away: validCombinations[validCombinations.length - 1].away };
 }
 
+/** Eleme maçı skorundan kazananı döndürür (resmi öncelikli) */
+function resolveKOWinnerFromScores(idA, idB, officialKOScores = {}, knockoutScores = {}) {
+  if (!idA || !idB) return idA || idB || null;
+  const key = `ko_${[idA, idB].sort().join("_")}`;
+  const sc = officialKOScores[key] || knockoutScores[key];
+  if (!sc || sc.home === "" || sc.away === "" || sc.home === undefined || sc.away === undefined) return null;
+  const sorted = [idA, idB].sort();
+  const h = parseInt(sc.home, 10);
+  const a = parseInt(sc.away, 10);
+  if (isNaN(h) || isNaN(a)) return null;
+  if (h > a) return sorted[0];
+  if (a > h) return sorted[1];
+  return sorted[0];
+}
+
+function buildSimCacheKey(officialScores, customElo, officialKOScores, knockoutScores) {
+  return JSON.stringify({ officialScores, customElo, officialKOScores, knockoutScores });
+}
+
 /** Grup pozisyon olasılıkları — yalnızca resmi skorlar sabit, kalan maçlar ELO ile simüle */
 function computeOfficialGroupPositionProbs(gTeams, gFixtures, officialScores, teams, simCount = 8000) {
   const officialMap = buildScoresMap(gFixtures, (f) => {
@@ -1503,7 +1522,7 @@ export default function App() {
   };
 
   // === MONTE CARLO SIMÜLASYON MOTORU ===
-  function runAdvancedSimulation(teams, userScores) {
+  function runAdvancedSimulation(teams, groupOfficialScores, koOfficial, koUser) {
     const SIM_COUNT = 10000;
     const stats = {};
     const matchupStats = {};
@@ -1516,6 +1535,13 @@ export default function App() {
       stats[id] = { id, r32:0,r16:0,qf:0,sf:0,f:0,champion:0,thirdPlaceChamp:0,g1:0,g2:0,g3:0,g4:0 };
       encounterStats[id] = {};
     });
+
+    const pickWinner = (idA, idB) => {
+      const fixed = resolveKOWinnerFromScores(idA, idB, koOfficial, koUser);
+      if (fixed) return fixed;
+      const pA = getWinProbability(teams[idA].elo, teams[idB].elo);
+      return Math.random() < pA ? idA : idB;
+    };
 
     const addEncounter = (idA, idB, round, posA, posB) => {
       if (!idA || !idB) return;
@@ -1544,7 +1570,7 @@ export default function App() {
       const simScoresMap = {};
 
       fixtures.forEach(f => {
-        const saved = officialScores[f.id];
+        const saved = groupOfficialScores[f.id];
         let hG = 0; let aG = 0;
 
         if (saved && saved.home !== "" && saved.away !== "") {
@@ -1622,8 +1648,7 @@ export default function App() {
           if(!matchupStats[pk]) matchupStats[pk]={total:0,[idA]:0,[idB]:0};
           matchupStats[pk].total++;
           addEncounter(idA, idB, roundKey, groupPos[idA], groupPos[idB]);
-          const pA=getWinProbability(teams[idA].elo,teams[idB].elo);
-          const winner = Math.random()<pA ? idA : idB;
+          const winner = pickWinner(idA, idB);
           const loser = winner === idA ? idB : idA;
           wL.push(winner); loL.push(loser); matchupStats[pk][winner]++;
           // İlk sim'de eleme kazananını kaydet
@@ -1639,13 +1664,13 @@ export default function App() {
       const sfM=sfR.pairs;
       if(sfM.length>=2){
         const sf1A=sfM[0][0],sf1B=sfM[0][1],sf2A=sfM[1][0],sf2B=sfM[1][1];
-        const w1=Math.random()<getWinProbability(teams[sf1A].elo,teams[sf1B].elo)?sf1A:sf1B; const l1=w1===sf1A?sf1B:sf1A;
-        const w2=Math.random()<getWinProbability(teams[sf2A].elo,teams[sf2B].elo)?sf2A:sf2B; const l2=w2===sf2A?sf2B:sf2A;
+        const w1=pickWinner(sf1A, sf1B); const l1=w1===sf1A?sf1B:sf1A;
+        const w2=pickWinner(sf2A, sf2B); const l2=w2===sf2A?sf2B:sf2A;
         addEncounter(w1, w2, "f", groupPos[w1], groupPos[w2]); // Final
-        const champ=Math.random()<getWinProbability(teams[w1].elo,teams[w2].elo)?w1:w2;
+        const champ=pickWinner(w1, w2);
         if(stats[champ])stats[champ].champion++;
         addEncounter(l1, l2, "f", groupPos[l1], groupPos[l2]); // 3.lük
-        const tpw=Math.random()<getWinProbability(teams[l1].elo,teams[l2].elo)?l1:l2;
+        const tpw=pickWinner(l1, l2);
         if(stats[tpw])stats[tpw].thirdPlaceChamp++;
       }
     }
@@ -1668,9 +1693,9 @@ export default function App() {
     setSimRunning(true);
     window.setTimeout(() => {
       try {
-        const results = runAdvancedSimulation(activeTeams, officialScores);
+        const results = runAdvancedSimulation(activeTeams, officialScores, officialKOScores, knockoutScores);
         const payload = {
-          key: JSON.stringify({ officialScores, customElo }),
+          key: buildSimCacheKey(officialScores, customElo, officialKOScores, knockoutScores),
           results,
           updatedAt: Date.now(),
         };
@@ -1684,7 +1709,10 @@ export default function App() {
         setSimRunning(false);
       }
     }, 30);
-  }, [simRunning, activeTeams, officialScores, customElo, setSimCache]);
+  }, [simRunning, activeTeams, officialScores, customElo, officialKOScores, knockoutScores, setSimCache]);
+
+  const simInputKey = buildSimCacheKey(officialScores, customElo, officialKOScores, knockoutScores);
+  const prevSimKeyRef = useRef(null);
 
   // İlk açılışta kayıtlı simülasyonu yükle — otomatik yeniden simüle etme
   useEffect(() => {
@@ -1698,14 +1726,25 @@ export default function App() {
       } catch (_) { /* ignore */ }
     }
 
-    if (cached?.results) {
+    if (cached?.results && cached.key === simInputKey) {
       setSimResults(cached.results);
       if (cached.results.displayScores) {
         setSingleDisplayScores(cached.results.displayScores);
       }
       if (!simCache?.results) setSimCache(cached);
+    } else if (cached?.results && cached.key !== simInputKey) {
+      refreshSimulation();
     }
-  }, [dbLoaded, simCacheLoaded, simCache, simResults, setSimCache]);
+  }, [dbLoaded, simCacheLoaded, simCache, simResults, setSimCache, simInputKey, refreshSimulation]);
+
+  // Resmi eleme skoru veya grup skoru değişince simülasyonu güncelle
+  useEffect(() => {
+    if (!dbLoaded || !simCacheLoaded) return;
+    const prev = prevSimKeyRef.current;
+    prevSimKeyRef.current = simInputKey;
+    if (prev === null || prev === simInputKey || !simResults) return;
+    refreshSimulation();
+  }, [simInputKey, dbLoaded, simCacheLoaded, simResults, refreshSimulation]);
 
   const buildLiveBracket = () => {
     if (!simResults || !liveTableData.groups || Object.keys(liveTableData.groups).length === 0) return null;
