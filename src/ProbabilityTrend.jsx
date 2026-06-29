@@ -330,49 +330,50 @@ export default function ProbabilityTrend({ snapshots, teams, getFlagUrl }) {
               </svg>
             </div>
 
-            {/* Hover: büyük olasılık kartları */}
+            {/* Güncel olasılık kartları — her zaman son değer */}
             <div style={{
               marginTop: 10,
-              minHeight: 40,
               padding: "10px 12px",
               borderRadius: 8,
-              background: hoverIdx !== null ? "#fff" : "#f8fafc",
-              border: `1px solid ${hoverIdx !== null ? "#e2e8f0" : "#e2e8f0"}`,
+              background: "#fff",
+              border: "1px solid #e2e8f0",
             }}>
-              {hoverIdx === null ? (
-                <div style={{ fontSize: 10.5, color: "#94a3b8", textAlign: "center", fontFamily: "monospace" }}>
-                  Olasılıkları görmek için grafiğin üzerine gelin
-                </div>
-              ) : (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-                  {chartSeries.map((s) => {
-                    const pt = s.mapped.find((p) => p.snapIdx === hoverIdx);
-                    if (!pt) return null;
-                    return (
-                      <div
-                        key={s.id}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 8,
-                          padding: "8px 14px", borderRadius: 8,
-                          background: `${s.color}14`,
-                          border: `2px solid ${s.color}`,
-                        }}
-                      >
-                        <img src={getFlagUrl(teams[s.teamId]?.iso)} style={{ width: 20, height: 13, borderRadius: 2 }} alt="" />
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>{s.teamName}</div>
-                          {selectedMetrics.size > 1 && (
-                            <div style={{ fontSize: 9, color: "#64748b" }}>{s.metricLabel}</div>
-                          )}
-                        </div>
-                        <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 18, color: s.color }}>
-                          {pt.value.toFixed(1)}%
-                        </span>
+              <div style={{ fontSize: 9, fontWeight: 800, color: "#94a3b8", letterSpacing: "0.06em", marginBottom: 8, fontFamily: "monospace" }}>
+                GÜNCEL OLASILIKLAR
+                {sortedSnaps.length > 0 && (
+                  <span style={{ fontWeight: 600, marginLeft: 6, color: "#cbd5e1" }}>
+                    · {sortedSnaps[sortedSnaps.length - 1].label}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                {chartSeries.map((s) => {
+                  const pt = s.mapped[s.mapped.length - 1];
+                  if (!pt) return null;
+                  return (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        padding: "8px 14px", borderRadius: 8,
+                        background: `${s.color}14`,
+                        border: `2px solid ${s.color}`,
+                      }}
+                    >
+                      <img src={getFlagUrl(teams[s.teamId]?.iso)} style={{ width: 20, height: 13, borderRadius: 2 }} alt="" />
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>{s.teamName}</div>
+                        {selectedMetrics.size > 1 && (
+                          <div style={{ fontSize: 9, color: "#64748b" }}>{s.metricLabel}</div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 18, color: s.color }}>
+                        {pt.value.toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </>
         )}
