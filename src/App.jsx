@@ -3,6 +3,12 @@ import { getFifaTargetThird } from "./fifaMatrix";
 import { buildScoresMap, compareBestThirdPlace, rankGroupByFifaRules } from "./fifaStandings";
 import { buildTemplateOfficialBracket } from "./officialBracketTemplate";
 import { usePersistentState } from "./usePersistentState";
+import ProbabilityTrend from "./ProbabilityTrend";
+import {
+  mergeSeedHistory,
+  snapshotFromSimResults,
+  appendProbabilitySnapshot,
+} from "./probabilityHistory";
 
 
 // --- TAKIM VERİLERİ ---
@@ -769,6 +775,7 @@ export default function App() {
 
   // --- Simülasyon önbelleği — DB'ye kaydedilir, sayfa yenilemede tekrar çalışmaz ---
   const [simCache, setSimCache, simCacheLoaded] = usePersistentState("simCache", null);
+  const [probHistory, setProbHistory, probHistoryLoaded] = usePersistentState("probHistory", null);
   const [simResults, setSimResults] = useState(null);
   const [simRunning, setSimRunning] = useState(false);
   const [singleDisplayScores, setSingleDisplayScores] = useState({});
@@ -1708,11 +1715,24 @@ export default function App() {
         } catch (_) { /* ignore quota */ }
         setSimResults(results);
         if (results?.displayScores) setSingleDisplayScores(results.displayScores);
+        const snap = snapshotFromSimResults(results, {
+          simKey: payload.key,
+          recordedAt: payload.updatedAt,
+        });
+        setProbHistory((prev) => appendProbabilitySnapshot(prev, snap));
       } finally {
         setSimRunning(false);
       }
     }, 30);
-  }, [simRunning, activeTeams, officialScores, customElo, officialKOScores, knockoutScores, setSimCache]);
+  }, [simRunning, activeTeams, officialScores, customElo, officialKOScores, knockoutScores, setSimCache, setProbHistory]);
+
+  // Geçmiş seed verilerini bir kez yükle
+  useEffect(() => {
+    if (!probHistoryLoaded) return;
+    setProbHistory((prev) => mergeSeedHistory(prev));
+  }, [probHistoryLoaded, setProbHistory]);
+
+  const trendSnapshots = probHistory?.snapshots ?? [];
 
   const simInputKey = buildSimCacheKey(officialScores, customElo, officialKOScores, knockoutScores);
   const prevSimKeyRef = useRef(null);
@@ -2102,7 +2122,7 @@ export default function App() {
 
         {/* Desktop nav */}
         <nav className="desktop-nav" style={{display:"flex",background:"rgba(255,255,255,0.06)",padding:3,borderRadius:11,border:"1px solid rgba(255,255,255,0.1)",gap:2}}>
-          {[["bracket","Turnuva Ağacı"],["livestatus","Canlı Durum"],["groupstats","Grup Analizi"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["difficulty","Fikstür Zorluğu"],["elo","ELO Güncelle"]].map(([tab,label])=>(
+          {[["bracket","Turnuva Ağacı"],["livestatus","Canlı Durum"],["groupstats","Grup Analizi"],["groups","Skor Girişi"],["matrix","Olasılık Matrisi"],["trend","Olasılık Trendi"],["difficulty","Fikstür Zorluğu"],["elo","ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>setActiveTab(tab)} className={`nav-btn ${activeTab===tab?"active":"inactive"}`}>{label}</button>
           ))}
         </nav>
@@ -2123,7 +2143,7 @@ export default function App() {
       {/* Mobile dropdown menu */}
       {menuOpen && (
         <div className="mobile-menu" style={{position:"sticky",top:52,zIndex:190,background:"#0d1628",borderBottom:"1px solid rgba(255,255,255,0.10)",padding:"8px 12px",display:"flex",flexDirection:"column",gap:4,boxShadow:"0 8px 24px rgba(0,0,0,0.3)"}}>
-          {[["bracket","🏆 Turnuva Ağacı"],["livestatus","📡 Canlı Durum"],["groupstats","📈 Grup Analizi"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["difficulty","🎯 Fikstür Zorluğu"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
+          {[["bracket","🏆 Turnuva Ağacı"],["livestatus","📡 Canlı Durum"],["groupstats","📈 Grup Analizi"],["groups","⚽ Skor Girişi"],["matrix","📊 Olasılık Matrisi"],["trend","📈 Olasılık Trendi"],["difficulty","🎯 Fikstür Zorluğu"],["elo","⚡ ELO Güncelle"]].map(([tab,label])=>(
             <button key={tab} onClick={()=>{setActiveTab(tab);setMenuOpen(false);}}
               style={{
                 width:"100%",textAlign:"left",padding:"11px 14px",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",border:"none",
@@ -2145,7 +2165,7 @@ export default function App() {
           </div>
         )}
 
-        {!simResults && !simRunning && activeTab !== "livestatus" && activeTab !== "elo" && (
+        {!simResults && !simRunning && activeTab !== "livestatus" && activeTab !== "elo" && activeTab !== "trend" && (
           <div style={{marginBottom:12,background:"#fffbeb",border:"1px solid #f59e0b",borderRadius:10,padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
             <span style={{fontSize:12,color:"#92400e",fontWeight:500}}>Henüz simülasyon yok. Tahmin ve olasılık verileri için <strong>Güncelle</strong> butonuna basın.</span>
             <button onClick={refreshSimulation} style={{padding:"6px 14px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:"monospace"}}>🔄 Simülasyonu Başlat</button>
@@ -3055,6 +3075,15 @@ export default function App() {
             </div>
           );
         })()}
+
+        {/* === OLASILIK TRENDİ TAB === */}
+        {activeTab === "trend" && probHistoryLoaded && (
+          <ProbabilityTrend
+            snapshots={trendSnapshots}
+            teams={INITIAL_TEAMS}
+            getFlagUrl={getFlagUrl}
+          />
+        )}
 
         {/* === ELO TAB === */}
         {activeTab==="elo" && (
